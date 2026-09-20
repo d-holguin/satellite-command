@@ -1,0 +1,20 @@
+<header class="mission-header">
+  <div class="identity">
+    <span class="eyebrow">Orbital visualization system</span>
+    <span class="title">Satellite Command</span>
+  </div>
+
+  <div class="telemetry" aria-live="off">
+    <span class="live-indicator"><span class="live-dot"></span>Live</span>
+    <time [dateTime]="currentTime().toISOString()">
+      {{ currentTime() | date: "yyyy-MM-dd HH:mm:ss 'UTC'" : 'UTC' }}
+    </time>
+  </div>
+</header>
+
+<div class="reticle" aria-hidden="true"></div>
+
+<footer class="coordinate-key" aria-hidden="true">
+  <span>Earth reference</span>
+  <span>R = 1.000</span>
+</footer>

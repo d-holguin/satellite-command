@@ -1,12 +1,11 @@
-import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component } from '@angular/core';
+import { GlobeComponent } from './globe/globe.component';
+import { HudComponent } from './hud/hud.component';
 
 @Component({
-  imports: [RouterOutlet],
+  imports: [GlobeComponent, HudComponent],
   selector: 'app-root',
   styleUrl: './app.scss',
   templateUrl: './app.html',
 })
-export class App {
-  protected readonly title = signal('satellite-command');
-}
+export class App {}

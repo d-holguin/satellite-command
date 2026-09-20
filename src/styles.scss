@@ -1,1 +1,26 @@
-/* You can add global styles to this file, and also import other style files */
+html,
+body,
+app-root {
+  width: 100%;
+  height: 100%;
+}
+
+html {
+  background: #020509;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #020509;
+  color: #e8eef4;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}

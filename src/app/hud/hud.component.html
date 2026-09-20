@@ -12,46 +12,129 @@
   </div>
 </header>
 
-<section class="iss-panel" aria-label="International Space Station telemetry">
-  <div class="iss-heading">
-    <span class="iss-name">ISS (ZARYA)</span>
-    <span class="track-status" [class.is-ready]="issStatus() === 'available'">
-      {{ issStatus() === 'available' ? 'Tracking' : issStatus() }}
+<section class="command-panel hud-panel" aria-label="Satellite catalog controls">
+  <div class="panel-heading">
+    <span>Orbital catalog</span>
+    <span class="catalog-status" [class.is-ready]="catalogStatus() === 'tracking'">
+      @switch (catalogStatus()) {
+        @case ('loading') {
+          Loading catalog
+        }
+        @case ('initializing') {
+          Initializing SGP4
+        }
+        @case ('tracking') {
+          Tracking
+        }
+        @default {
+          Unavailable
+        }
+      }
     </span>
   </div>
 
-  @if (issTelemetry(); as iss) {
-    <dl class="telemetry-grid">
+  <dl class="command-stats">
+    <dt>Tracked</dt>
+    <dd>{{ formatInteger(trackedCount()) }}</dd>
+    <dt>Displayed</dt>
+    <dd>{{ formatInteger(displayedCount()) }}</dd>
+    <dt>Mode</dt>
+    <dd>Live</dd>
+    <dt>Data age</dt>
+    <dd>{{ catalog() ? formatAge(catalog()!.generatedAt) : '—' }}</dd>
+  </dl>
+
+  <div class="filter-controls" aria-label="Filter satellites by category">
+    @for (filter of filters; track filter) {
+      <button
+        type="button"
+        class="filter-button"
+        [class.is-active]="activeFilter() === filter"
+        (click)="setFilter(filter)"
+      >
+        {{ filter }}
+      </button>
+    }
+  </div>
+
+  <label class="search-field">
+    <span>Catalog search</span>
+    <input
+      type="search"
+      placeholder="NAME / NORAD"
+      autocomplete="off"
+      [value]="searchQuery()"
+      (input)="updateSearch($event)"
+    />
+  </label>
+
+  @if (searchResults().length > 0) {
+    <ul class="search-results">
+      @for (result of searchResults(); track result.index) {
+        <li>
+          <button type="button" (click)="selectSatellite(result.index)">
+            <span>{{ result.satellite.name }}</span>
+            <span>{{ result.satellite.noradId }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</section>
+
+<section class="selection-panel hud-panel" aria-label="Selected satellite telemetry">
+  @if (selectedSatellite(); as satellite) {
+    <div class="panel-heading">
+      <span class="selected-name">{{ satellite.name }}</span>
+      <button
+        class="close-button"
+        type="button"
+        (click)="clearSelection()"
+        aria-label="Clear target"
+      >
+        ×
+      </button>
+    </div>
+
+    <dl class="selected-grid">
       <dt>Norad</dt>
-      <dd>{{ iss.noradId }}</dd>
-      <dt>Lat</dt>
-      <dd>{{ formatLatitude(iss.latitudeDeg) }}</dd>
-      <dt>Lon</dt>
-      <dd>{{ formatLongitude(iss.longitudeDeg) }}</dd>
-      <dt>Alt</dt>
-      <dd>{{ iss.altitudeKm.toFixed(0) }} km</dd>
-      <dt>Vel</dt>
-      <dd>{{ iss.velocityKmS.toFixed(2) }} km/s</dd>
+      <dd>{{ satellite.noradId }}</dd>
+      @if (selectedTelemetry(); as selected) {
+        <dt>Lat</dt>
+        <dd>{{ formatLatitude(selected.latitudeDeg) }}</dd>
+        <dt>Lon</dt>
+        <dd>{{ formatLongitude(selected.longitudeDeg) }}</dd>
+        <dt>Alt</dt>
+        <dd>{{ selected.altitudeKm.toFixed(0) }} km</dd>
+        <dt>Vel</dt>
+        <dd>{{ selected.velocityKmS.toFixed(2) }} km/s</dd>
+      }
+      <dt>Incl</dt>
+      <dd>{{ satellite.inclination.toFixed(2) }}°</dd>
     </dl>
 
-    <div class="element-epoch">
-      <span>Element epoch</span>
-      <time [dateTime]="iss.elementEpoch.toISOString()">
-        {{ iss.elementEpoch | date: "yyyy-MM-dd HH:mm 'UTC'" : 'UTC' }}
-      </time>
+    <div class="target-meta">
+      <span>{{ satellite.categories.join(' / ') }}</span>
+      <span>Epoch {{ satellite.epoch | date: "yyyy-MM-dd HH:mm 'UTC'" : 'UTC' }}</span>
+      <span>Elements {{ formatAge(satellite.epoch) }} old</span>
     </div>
-    <div class="pipeline" aria-hidden="true">OMM → SGP4 → ECF</div>
+
+    <div class="target-actions">
+      <button type="button" [class.is-active]="showOrbit()" (click)="toggleOrbit()">
+        {{ showOrbit() ? 'Hide orbit' : 'Show orbit' }}
+      </button>
+      <button type="button" (click)="focusSatellite()">Focus</button>
+    </div>
   } @else {
-    <p class="empty-state">
-      {{ issStatus() === 'loading' ? 'Acquiring orbital elements' : 'Telemetry unavailable' }}
-    </p>
+    <div class="panel-heading"><span>Target acquisition</span><span>Standby</span></div>
+    <p class="empty-state">Select a visible point or search the orbital catalog.</p>
   }
 </section>
 
 <div class="reticle" aria-hidden="true"></div>
 
-<section class="surface-panel" aria-label="Location beneath the center reticle">
-  <div class="surface-heading">
+<section class="surface-panel hud-panel" aria-label="Location beneath the center reticle">
+  <div class="panel-heading">
     <span>Surface reference</span>
     <span>R = 1.000</span>
   </div>

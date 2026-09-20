@@ -81,6 +81,8 @@ export class SatellitePropagator {
         velocityKmS,
         timestamp: new Date(timestamp),
         elementEpoch: new Date(this.elementEpoch),
+        inclinationDeg: Number(this.satrec.inclo) * (180 / Math.PI),
+        categories: ['OTHER'],
       },
     };
   }

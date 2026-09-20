@@ -3,6 +3,7 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 canvas {
@@ -15,4 +16,33 @@ canvas {
 
 canvas:active {
   cursor: grabbing;
+}
+
+.satellite-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  padding: 0.22rem 0.38rem;
+  border: 1px solid rgba(139, 225, 247, 0.48);
+  background: rgba(2, 8, 13, 0.72);
+  color: #dffaff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  pointer-events: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.satellite-label::after {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 1px;
+  height: 0.7rem;
+  background: rgba(139, 225, 247, 0.48);
+  content: '';
 }

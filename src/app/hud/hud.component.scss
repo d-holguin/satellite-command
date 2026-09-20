@@ -24,8 +24,7 @@
 }
 
 .eyebrow,
-.telemetry,
-.coordinate-key {
+.telemetry {
   color: rgba(177, 199, 211, 0.65);
   font-size: clamp(0.58rem, 1.3vw, 0.68rem);
   line-height: 1.2;
@@ -58,6 +57,92 @@
   box-shadow: 0 0 0.6rem rgba(99, 230, 163, 0.7);
 }
 
+.iss-panel {
+  position: absolute;
+  bottom: clamp(1rem, 3vw, 2.5rem);
+  left: clamp(1rem, 3vw, 2.5rem);
+  width: min(15.5rem, calc(100vw - 2rem));
+  padding: 0.8rem 0.9rem 0.85rem;
+  border: 1px solid rgba(157, 194, 214, 0.2);
+  background: linear-gradient(135deg, rgba(5, 13, 19, 0.76), rgba(5, 13, 19, 0.42));
+  backdrop-filter: blur(0.35rem);
+  font-size: 0.64rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.iss-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.62rem;
+  border-bottom: 1px solid rgba(157, 194, 214, 0.16);
+}
+
+.iss-name {
+  color: #effaff;
+  font-size: 0.72rem;
+  letter-spacing: 0.13em;
+}
+
+.track-status {
+  color: rgba(177, 199, 211, 0.52);
+  font-size: 0.52rem;
+}
+
+.track-status.is-ready {
+  color: #75dfaa;
+}
+
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: 3.3rem 1fr;
+  gap: 0.38rem 0.75rem;
+  margin: 0.72rem 0;
+}
+
+.telemetry-grid dt,
+.telemetry-grid dd {
+  margin: 0;
+}
+
+.telemetry-grid dt,
+.element-epoch span,
+.pipeline {
+  color: rgba(177, 199, 211, 0.5);
+}
+
+.telemetry-grid dd {
+  color: rgba(225, 238, 244, 0.9);
+  text-align: right;
+}
+
+.element-epoch {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  padding-top: 0.62rem;
+  border-top: 1px solid rgba(157, 194, 214, 0.16);
+  color: rgba(205, 222, 230, 0.75);
+  font-size: 0.55rem;
+  line-height: 1.35;
+}
+
+.pipeline {
+  margin-top: 0.62rem;
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+}
+
+.empty-state {
+  min-height: 4.8rem;
+  margin: 0;
+  padding-top: 0.8rem;
+  color: rgba(177, 199, 211, 0.5);
+  font-size: 0.55rem;
+  line-height: 1.5;
+}
+
 .reticle {
   position: absolute;
   top: 50%;
@@ -65,7 +150,7 @@
   width: min(52vw, 34rem);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
-  border: 1px solid rgba(153, 196, 219, 0.05);
+  border: 1px solid rgba(153, 196, 219, 0.11);
   border-radius: 50%;
 }
 
@@ -75,7 +160,7 @@
   top: 50%;
   left: 50%;
   content: '';
-  background: rgba(153, 196, 219, 0.14);
+  background: rgba(153, 196, 219, 0.22);
   transform: translate(-50%, -50%);
 }
 
@@ -89,14 +174,104 @@
   height: 2.25rem;
 }
 
-.coordinate-key {
+.surface-panel {
   position: absolute;
   right: clamp(1rem, 3vw, 2.5rem);
   bottom: clamp(1rem, 3vw, 2.5rem);
+  width: min(18.5rem, calc(100vw - 2rem));
+  padding: 0.8rem 0.9rem 0.85rem;
+  border: 1px solid rgba(157, 194, 214, 0.2);
+  background: linear-gradient(225deg, rgba(5, 13, 19, 0.76), rgba(5, 13, 19, 0.42));
+  backdrop-filter: blur(0.35rem);
+  font-size: 0.58rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.surface-heading {
   display: flex;
-  gap: 1rem;
-  padding-bottom: 0.65rem;
-  border-bottom: 1px solid rgba(157, 194, 214, 0.25);
+  justify-content: space-between;
+  padding-bottom: 0.62rem;
+  border-bottom: 1px solid rgba(157, 194, 214, 0.16);
+  color: rgba(177, 199, 211, 0.65);
+}
+
+.surface-grid {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  gap: 0.38rem 0.75rem;
+  margin: 0.72rem 0;
+}
+
+.surface-grid dt,
+.surface-grid dd {
+  margin: 0;
+}
+
+.surface-grid dt,
+.address-label {
+  color: rgba(177, 199, 211, 0.5);
+}
+
+.surface-grid dd {
+  color: rgba(225, 238, 244, 0.9);
+  text-align: right;
+}
+
+.address {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-top: 0.62rem;
+  border-top: 1px solid rgba(157, 194, 214, 0.16);
+  line-height: 1.35;
+  text-transform: none;
+}
+
+.address-label {
+  text-transform: uppercase;
+}
+
+.address-primary {
+  color: rgba(235, 245, 249, 0.92);
+}
+
+.address-secondary,
+.address-status {
+  color: rgba(177, 199, 211, 0.62);
+}
+
+.map-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.7rem;
+  padding-top: 0.58rem;
+  border-top: 1px solid rgba(157, 194, 214, 0.16);
+  color: #8ed8f4;
+  pointer-events: auto;
+  text-decoration: none;
+}
+
+.attribution {
+  display: block;
+  margin-top: 0.52rem;
+  color: rgba(177, 199, 211, 0.38);
+  font-size: 0.45rem;
+  text-transform: none;
+}
+
+.attribution a {
+  color: inherit;
+  pointer-events: auto;
+}
+
+@media (max-width: 720px) {
+  .surface-panel {
+    top: 5.5rem;
+    right: 1rem;
+    bottom: auto;
+    width: min(14.5rem, calc(100vw - 2rem));
+  }
 }
 
 @media (max-width: 520px) {
@@ -108,7 +283,7 @@
     display: none;
   }
 
-  .coordinate-key {
-    display: none;
+  .iss-panel {
+    padding: 0.7rem 0.8rem;
   }
 }

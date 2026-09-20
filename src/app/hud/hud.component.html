@@ -12,9 +12,101 @@
   </div>
 </header>
 
+<section class="iss-panel" aria-label="International Space Station telemetry">
+  <div class="iss-heading">
+    <span class="iss-name">ISS (ZARYA)</span>
+    <span class="track-status" [class.is-ready]="issStatus() === 'available'">
+      {{ issStatus() === 'available' ? 'Tracking' : issStatus() }}
+    </span>
+  </div>
+
+  @if (issTelemetry(); as iss) {
+    <dl class="telemetry-grid">
+      <dt>Norad</dt>
+      <dd>{{ iss.noradId }}</dd>
+      <dt>Lat</dt>
+      <dd>{{ formatLatitude(iss.latitudeDeg) }}</dd>
+      <dt>Lon</dt>
+      <dd>{{ formatLongitude(iss.longitudeDeg) }}</dd>
+      <dt>Alt</dt>
+      <dd>{{ iss.altitudeKm.toFixed(0) }} km</dd>
+      <dt>Vel</dt>
+      <dd>{{ iss.velocityKmS.toFixed(2) }} km/s</dd>
+    </dl>
+
+    <div class="element-epoch">
+      <span>Element epoch</span>
+      <time [dateTime]="iss.elementEpoch.toISOString()">
+        {{ iss.elementEpoch | date: "yyyy-MM-dd HH:mm 'UTC'" : 'UTC' }}
+      </time>
+    </div>
+    <div class="pipeline" aria-hidden="true">OMM → SGP4 → ECF</div>
+  } @else {
+    <p class="empty-state">
+      {{ issStatus() === 'loading' ? 'Acquiring orbital elements' : 'Telemetry unavailable' }}
+    </p>
+  }
+</section>
+
 <div class="reticle" aria-hidden="true"></div>
 
-<footer class="coordinate-key" aria-hidden="true">
-  <span>Earth reference</span>
-  <span>R = 1.000</span>
-</footer>
+<section class="surface-panel" aria-label="Location beneath the center reticle">
+  <div class="surface-heading">
+    <span>Surface reference</span>
+    <span>R = 1.000</span>
+  </div>
+
+  @if (reticleCoordinates(); as coordinates) {
+    <dl class="surface-grid">
+      <dt>Lat</dt>
+      <dd>{{ formatLatitude(coordinates.latitudeDeg) }}</dd>
+      <dt>Lon</dt>
+      <dd>{{ formatLongitude(coordinates.longitudeDeg) }}</dd>
+    </dl>
+
+    <div class="address" aria-live="polite">
+      <span class="address-label">Nearest mapped address</span>
+      @if (reticleAddress(); as address) {
+        <span class="address-primary">{{ address.primaryLine }}</span>
+        @if (address.secondaryLine) {
+          <span class="address-secondary">{{ address.secondaryLine }}</span>
+        }
+      } @else {
+        <span class="address-status">
+          @switch (reticleAddressStatus()) {
+            @case ('loading') {
+              Resolving location…
+            }
+            @case ('unavailable') {
+              No mapped address available
+            }
+            @default {
+              Hold view to resolve
+            }
+          }
+        </span>
+      }
+    </div>
+
+    @if (googleMapsUrl(); as mapUrl) {
+      <a
+        class="map-link"
+        [href]="mapUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Open the reticle location in Google Maps"
+      >
+        Open in Google Maps <span aria-hidden="true">↗</span>
+      </a>
+    }
+
+    <span class="attribution">
+      Address data ©
+      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">
+        OpenStreetMap contributors
+      </a>
+    </span>
+  } @else {
+    <p class="empty-state">Acquiring surface position</p>
+  }
+</section>

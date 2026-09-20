@@ -14,6 +14,7 @@ export const SATELLITE_CATEGORIES = [
 
 export type SatelliteCategory = (typeof SATELLITE_CATEGORIES)[number];
 export type SatelliteFilter = 'ALL' | SatelliteCategory;
+export type SatelliteColorMode = 'CATEGORY' | 'ALTITUDE';
 
 export interface SatelliteRecord {
   name: string;
@@ -63,6 +64,12 @@ export interface SatelliteTelemetry {
   elementEpoch: Date;
   inclinationDeg: number;
   categories: SatelliteCategory[];
+}
+
+export interface OrbitalMetrics {
+  periodMinutes: number;
+  perigeeKm: number;
+  apogeeKm: number;
 }
 
 export interface PropagatedSatelliteState {

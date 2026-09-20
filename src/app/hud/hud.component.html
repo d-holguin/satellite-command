@@ -5,12 +5,55 @@
   </div>
 
   <div class="telemetry" aria-live="off">
-    <span class="live-indicator"><span class="live-dot"></span>Live</span>
+    <span class="live-indicator" [class.is-simulated]="simulationMode() !== 'live'">
+      <span class="live-dot"></span>
+      @switch (simulationMode()) {
+        @case ('live') {
+          Live
+        }
+        @case ('paused') {
+          Paused
+        }
+        @default {
+          Sim {{ simulationSpeed() }}×
+        }
+      }
+    </span>
     <time [dateTime]="currentTime().toISOString()">
       {{ currentTime() | date: "yyyy-MM-dd HH:mm:ss 'UTC'" : 'UTC' }}
     </time>
   </div>
 </header>
+
+<section class="time-panel hud-panel" aria-label="Simulation time controls">
+  <div class="panel-heading">
+    <span>Simulation time</span>
+    <span>{{ simulationMode() === 'live' ? 'UTC synchronized' : simulationMode() }}</span>
+  </div>
+  <time class="simulation-clock" [dateTime]="currentTime().toISOString()">
+    {{ currentTime() | date: "yyyy-MM-dd HH:mm:ss 'UTC'" : 'UTC' }}
+  </time>
+  <div class="time-actions">
+    <button type="button" [class.is-active]="simulationMode() === 'live'" (click)="returnToLive()">
+      Live
+    </button>
+    <button type="button" [class.is-active]="simulationMode() === 'paused'" (click)="togglePause()">
+      {{ simulationMode() === 'paused' ? 'Resume' : 'Pause' }}
+    </button>
+  </div>
+  <div class="speed-controls" aria-label="Simulation speed">
+    @for (speed of simulationSpeeds; track speed) {
+      <button
+        type="button"
+        [class.is-active]="simulationSpeed() === speed"
+        (click)="setSpeed(speed)"
+      >
+        {{ speed }}×
+      </button>
+    }
+  </div>
+  <span class="shortcut-hint">Space pause · L live · F follow · O orbit · G ground</span>
+</section>
 
 <section class="command-panel hud-panel" aria-label="Satellite catalog controls">
   <div class="panel-heading">
@@ -39,7 +82,11 @@
     <dt>Displayed</dt>
     <dd>{{ formatInteger(displayedCount()) }}</dd>
     <dt>Mode</dt>
-    <dd>Live</dd>
+    <dd>
+      {{ simulationMode() === 'live' ? 'Live' : simulationMode() === 'paused' ? 'Paused' : 'Sim' }}
+    </dd>
+    <dt>Rate</dt>
+    <dd>{{ simulationSpeed() }}×</dd>
     <dt>Data age</dt>
     <dd>{{ catalog() ? formatAge(catalog()!.generatedAt) : '—' }}</dd>
   </dl>
@@ -56,6 +103,60 @@
       </button>
     }
   </div>
+
+  <div class="visualization-controls">
+    <span>Color by</span>
+    <div>
+      <button
+        type="button"
+        [class.is-active]="colorMode() === 'CATEGORY'"
+        (click)="setColorMode('CATEGORY')"
+      >
+        Category
+      </button>
+      <button
+        type="button"
+        [class.is-active]="colorMode() === 'ALTITUDE'"
+        (click)="setColorMode('ALTITUDE')"
+      >
+        Altitude
+      </button>
+    </div>
+    <button
+      type="button"
+      class="reference-toggle"
+      [class.is-active]="showReferenceOrbits()"
+      (click)="toggleReferenceOrbits()"
+    >
+      Orbital bands
+    </button>
+    <button
+      type="button"
+      class="reference-toggle"
+      [class.is-active]="observerEnabled()"
+      (click)="toggleObserverMode()"
+    >
+      {{ observerEnabled() ? 'Disable observer' : 'Enable observer' }}
+    </button>
+    @if (observerLocation()) {
+      <button
+        type="button"
+        class="reference-toggle"
+        [class.is-active]="aboveOnly()"
+        (click)="toggleAboveOnly()"
+      >
+        Above me · {{ observerAboveCount() }}
+      </button>
+    }
+  </div>
+
+  @if (colorMode() === 'ALTITUDE') {
+    <div class="altitude-legend">
+      <span><span>Low</span><span>High</span></span>
+      <i></i>
+      <span><span>0 km</span><span>2k</span><span>20.2k</span><span>40k+ km</span></span>
+    </div>
+  }
 
   <label class="search-field">
     <span>Catalog search</span>
@@ -84,6 +185,7 @@
 
 <section class="selection-panel hud-panel" aria-label="Selected satellite telemetry">
   @if (selectedSatellite(); as satellite) {
+    @let metrics = orbitalMetrics(satellite);
     <div class="panel-heading">
       <span class="selected-name">{{ satellite.name }}</span>
       <button
@@ -111,19 +213,79 @@
       }
       <dt>Incl</dt>
       <dd>{{ satellite.inclination.toFixed(2) }}°</dd>
+      <dt>Period</dt>
+      <dd>{{ metrics.periodMinutes.toFixed(1) }} min</dd>
+      <dt>Perigee</dt>
+      <dd>{{ metrics.perigeeKm.toFixed(0) }} km</dd>
+      <dt>Apogee</dt>
+      <dd>{{ metrics.apogeeKm.toFixed(0) }} km</dd>
+      @if (selectedObserverLook(); as look) {
+        <dt class="observer-divider">Az</dt>
+        <dd class="observer-divider">{{ look.azimuthDeg.toFixed(1) }}°</dd>
+        <dt>El</dt>
+        <dd>{{ look.elevationDeg.toFixed(1) }}°</dd>
+        <dt>Range</dt>
+        <dd>{{ look.rangeKm.toFixed(0) }} km</dd>
+        <dt>Direction</dt>
+        <dd>{{ look.direction }}</dd>
+        <dt>Status</dt>
+        <dd [class.is-above]="look.elevationDeg > 0">
+          {{ look.elevationDeg > 0 ? look.trend : 'Below horizon' }}
+        </dd>
+      }
     </dl>
 
     <div class="target-meta">
       <span>{{ satellite.categories.join(' / ') }}</span>
       <span>Epoch {{ satellite.epoch | date: "yyyy-MM-dd HH:mm 'UTC'" : 'UTC' }}</span>
       <span>Elements {{ formatAge(satellite.epoch) }} old</span>
+      @if (showVisibilityFootprint()) {
+        <span>Geometric horizon footprint · not radio coverage</span>
+      }
+      @if (observerLocation()) {
+        @if (passPending()) {
+          <span>Next pass · calculating…</span>
+        } @else if (passPrediction(); as pass) {
+          @switch (pass.status) {
+            @case ('PASS') {
+              <span>Rise {{ pass.riseTime | date: "MMM d HH:mm:ss 'UTC'" : 'UTC' }}</span>
+              <span>
+                Max {{ pass.maxElevationDeg?.toFixed(1) }}° ·
+                {{ pass.maxElevationTime | date: "HH:mm:ss 'UTC'" : 'UTC' }}
+              </span>
+              <span>Set {{ pass.setTime | date: "MMM d HH:mm:ss 'UTC'" : 'UTC' }}</span>
+            }
+            @case ('CONTINUOUS') {
+              <span>Pass · continuously above horizon</span>
+            }
+            @default {
+              <span>No pass in next 48h</span>
+            }
+          }
+        }
+      }
     </div>
 
     <div class="target-actions">
       <button type="button" [class.is-active]="showOrbit()" (click)="toggleOrbit()">
         {{ showOrbit() ? 'Hide orbit' : 'Show orbit' }}
       </button>
+      <button type="button" [class.is-active]="showGroundTrack()" (click)="toggleGroundTrack()">
+        {{ showGroundTrack() ? 'Hide ground' : 'Ground track' }}
+      </button>
+      <button type="button" [class.is-active]="follow()" (click)="toggleFollow()">
+        {{ follow() ? 'Exit follow' : 'Follow' }}
+      </button>
       <button type="button" (click)="focusSatellite()">Focus</button>
+      @if (observerLocation()) {
+        <button
+          type="button"
+          [class.is-active]="showVisibilityFootprint()"
+          (click)="toggleVisibilityFootprint()"
+        >
+          {{ showVisibilityFootprint() ? 'Hide footprint' : 'Footprint' }}
+        </button>
+      }
     </div>
   } @else {
     <div class="panel-heading"><span>Target acquisition</span><span>Standby</span></div>
@@ -133,63 +295,127 @@
 
 <div class="reticle" aria-hidden="true"></div>
 
-<section class="surface-panel hud-panel" aria-label="Location beneath the center reticle">
-  <div class="panel-heading">
-    <span>Surface reference</span>
-    <span>R = 1.000</span>
-  </div>
-
-  @if (reticleCoordinates(); as coordinates) {
-    <dl class="surface-grid">
-      <dt>Lat</dt>
-      <dd>{{ formatLatitude(coordinates.latitudeDeg) }}</dd>
-      <dt>Lon</dt>
-      <dd>{{ formatLongitude(coordinates.longitudeDeg) }}</dd>
-    </dl>
-
-    <div class="address" aria-live="polite">
-      <span class="address-label">Nearest mapped address</span>
-      @if (reticleAddress(); as address) {
-        <span class="address-primary">{{ address.primaryLine }}</span>
-        @if (address.secondaryLine) {
-          <span class="address-secondary">{{ address.secondaryLine }}</span>
-        }
-      } @else {
-        <span class="address-status">
-          @switch (reticleAddressStatus()) {
-            @case ('loading') {
-              Resolving location…
-            }
-            @case ('unavailable') {
-              No mapped address available
-            }
-            @default {
-              Hold view to resolve
-            }
-          }
-        </span>
-      }
+@if (observerEnabled()) {
+  <section class="observer-panel hud-panel" aria-label="Observer mode controls">
+    <div class="panel-heading">
+      <span>Observer mode</span>
+      <span [class.is-above]="observerStatus() === 'active'">{{ observerStatus() }}</span>
     </div>
 
-    @if (googleMapsUrl(); as mapUrl) {
-      <a
-        class="map-link"
-        [href]="mapUrl"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Open the reticle location in Google Maps"
-      >
-        Open in Google Maps <span aria-hidden="true">↗</span>
-      </a>
+    @if (observerLocation(); as observer) {
+      <dl class="surface-grid">
+        <dt>Lat</dt>
+        <dd>{{ formatLatitude(observer.latitudeDeg) }}</dd>
+        <dt>Lon</dt>
+        <dd>{{ formatLongitude(observer.longitudeDeg) }}</dd>
+        <dt>Above</dt>
+        <dd>{{ observerAboveCount() }}</dd>
+      </dl>
+      <app-sky-radar />
     }
 
-    <span class="attribution">
-      Address data ©
-      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">
-        OpenStreetMap contributors
-      </a>
-    </span>
-  } @else {
-    <p class="empty-state">Acquiring surface position</p>
-  }
-</section>
+    <button
+      type="button"
+      class="location-button"
+      [disabled]="observerStatus() === 'locating'"
+      (click)="useBrowserLocation()"
+    >
+      {{ observerStatus() === 'locating' ? 'Locating…' : 'Use my location' }}
+    </button>
+
+    <div class="manual-location">
+      <label>
+        <span>Latitude</span>
+        <input
+          type="number"
+          min="-90"
+          max="90"
+          step="any"
+          placeholder="33.4484"
+          [value]="manualLatitude()"
+          (input)="updateManualLatitude($event)"
+        />
+      </label>
+      <label>
+        <span>Longitude</span>
+        <input
+          type="number"
+          min="-180"
+          max="180"
+          step="any"
+          placeholder="-112.0740"
+          [value]="manualLongitude()"
+          (input)="updateManualLongitude($event)"
+        />
+      </label>
+      <button type="button" (click)="applyManualLocation()">Set coordinates</button>
+    </div>
+
+    @if (manualError() || observerError(); as error) {
+      <p class="observer-error">{{ manualError() || error }}</p>
+    }
+    <span class="privacy-note">Location stays in your browser.</span>
+    <span class="privacy-note">Above horizon is geometric, not guaranteed visible.</span>
+  </section>
+} @else {
+  <section class="surface-panel hud-panel" aria-label="Location beneath the center reticle">
+    <div class="panel-heading">
+      <span>Surface reference</span>
+      <span>R = 1.000</span>
+    </div>
+
+    @if (reticleCoordinates(); as coordinates) {
+      <dl class="surface-grid">
+        <dt>Lat</dt>
+        <dd>{{ formatLatitude(coordinates.latitudeDeg) }}</dd>
+        <dt>Lon</dt>
+        <dd>{{ formatLongitude(coordinates.longitudeDeg) }}</dd>
+      </dl>
+
+      <div class="address" aria-live="polite">
+        <span class="address-label">Nearest mapped address</span>
+        @if (reticleAddress(); as address) {
+          <span class="address-primary">{{ address.primaryLine }}</span>
+          @if (address.secondaryLine) {
+            <span class="address-secondary">{{ address.secondaryLine }}</span>
+          }
+        } @else {
+          <span class="address-status">
+            @switch (reticleAddressStatus()) {
+              @case ('loading') {
+                Resolving location…
+              }
+              @case ('unavailable') {
+                No mapped address available
+              }
+              @default {
+                Hold view to resolve
+              }
+            }
+          </span>
+        }
+      </div>
+
+      @if (googleMapsUrl(); as mapUrl) {
+        <a
+          class="map-link"
+          [href]="mapUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open the reticle location in Google Maps"
+        >
+          Open in Google Maps <span aria-hidden="true">↗</span>
+        </a>
+      }
+
+      <span class="attribution">
+        Address data ©
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">
+          OpenStreetMap contributors
+        </a>
+      </span>
+    } @else {
+      <p class="empty-state">Acquiring surface position</p>
+    }
+  </section>
+}

@@ -49,6 +49,15 @@
   color: #9ce8c0;
 }
 
+.live-indicator.is-simulated {
+  color: #e1c98d;
+}
+
+.live-indicator.is-simulated .live-dot {
+  background: #d8b960;
+  box-shadow: 0 0 0.6rem rgba(216, 185, 96, 0.55);
+}
+
 .live-dot {
   width: 0.38rem;
   height: 0.38rem;
@@ -74,6 +83,52 @@
   pointer-events: auto;
 }
 
+.time-panel {
+  top: clamp(6.3rem, 12vh, 7.8rem);
+  right: clamp(1rem, 3vw, 2.5rem);
+  pointer-events: auto;
+}
+
+.simulation-clock {
+  display: block;
+  padding: 0.7rem 0;
+  color: rgba(230, 241, 246, 0.9);
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.time-actions,
+.speed-controls {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.time-actions {
+  grid-template-columns: 1fr 1fr;
+}
+
+.speed-controls {
+  grid-template-columns: repeat(5, 1fr);
+  margin-top: 0.35rem;
+}
+
+.time-actions button,
+.speed-controls button {
+  min-width: 0;
+  padding: 0.38rem 0.15rem;
+  font-size: 0.48rem;
+}
+
+.shortcut-hint {
+  display: block;
+  margin-top: 0.55rem;
+  color: rgba(177, 199, 211, 0.38);
+  font-size: 0.43rem;
+  line-height: 1.4;
+  text-align: center;
+  text-transform: none;
+}
+
 .selection-panel {
   bottom: clamp(1rem, 3vw, 2.5rem);
   left: clamp(1rem, 3vw, 2.5rem);
@@ -84,6 +139,15 @@
   right: clamp(1rem, 3vw, 2.5rem);
   bottom: clamp(1rem, 3vw, 2.5rem);
   background: linear-gradient(225deg, rgba(5, 13, 19, 0.8), rgba(5, 13, 19, 0.46));
+}
+
+.observer-panel {
+  right: clamp(1rem, 3vw, 2.5rem);
+  bottom: clamp(1rem, 3vw, 2.5rem);
+  max-height: calc(100vh - 22rem);
+  overflow-y: auto;
+  pointer-events: auto;
+  background: linear-gradient(225deg, rgba(5, 13, 19, 0.9), rgba(5, 13, 19, 0.58));
 }
 
 .panel-heading {
@@ -104,6 +168,10 @@
 
 .catalog-status.is-ready {
   color: #75dfaa;
+}
+
+.is-above {
+  color: #8de0b5 !important;
 }
 
 .command-stats,
@@ -146,6 +214,52 @@
   border-top: 1px solid rgba(157, 194, 214, 0.16);
 }
 
+.visualization-controls {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(157, 194, 214, 0.16);
+  color: rgba(177, 199, 211, 0.5);
+  font-size: 0.5rem;
+}
+
+.visualization-controls > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+}
+
+.visualization-controls button {
+  padding: 0.34rem 0.2rem;
+  font-size: 0.46rem;
+}
+
+.visualization-controls .reference-toggle {
+  grid-column: 1 / -1;
+}
+
+.altitude-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.55rem;
+  color: rgba(177, 199, 211, 0.48);
+  font-size: 0.43rem;
+}
+
+.altitude-legend > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.altitude-legend i {
+  height: 2px;
+  background: linear-gradient(90deg, #5cc7eb, #8cc7bd, #c9b37a, #a380c7);
+}
+
 button,
 input {
   border: 1px solid rgba(157, 194, 214, 0.22);
@@ -158,6 +272,11 @@ input {
 
 button {
   cursor: pointer;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 button:hover,
@@ -223,6 +342,12 @@ button.is-active {
   font-size: 0.68rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.observer-divider {
+  margin-top: 0.28rem !important;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(157, 194, 214, 0.13);
 }
 
 .close-button {
@@ -296,6 +421,56 @@ button.is-active {
 
 .surface-grid {
   grid-template-columns: 2.5rem 1fr;
+}
+
+.location-button {
+  width: 100%;
+  padding: 0.48rem;
+}
+
+.manual-location {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+  padding-top: 0.62rem;
+  border-top: 1px solid rgba(157, 194, 214, 0.16);
+}
+
+.manual-location label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  color: rgba(177, 199, 211, 0.5);
+  font-size: 0.48rem;
+}
+
+.manual-location input {
+  min-width: 0;
+  padding: 0.42rem;
+  outline: none;
+}
+
+.manual-location button {
+  grid-column: 1 / -1;
+  padding: 0.44rem;
+}
+
+.observer-error {
+  margin: 0.55rem 0 0;
+  color: #e4aa94;
+  font-size: 0.48rem;
+  line-height: 1.4;
+  text-transform: none;
+}
+
+.privacy-note {
+  display: block;
+  margin-top: 0.55rem;
+  color: rgba(177, 199, 211, 0.42);
+  font-size: 0.45rem;
+  text-align: center;
+  text-transform: none;
 }
 
 .address {
@@ -373,7 +548,26 @@ button.is-active {
     width: auto;
   }
 
+  .time-panel {
+    top: 5rem;
+    right: 1rem;
+    width: 13rem;
+  }
+
   .surface-panel {
+    display: none;
+  }
+
+  .observer-panel {
+    right: 1rem;
+    bottom: 1rem;
+    width: 13rem;
+    max-height: 48vh;
+  }
+}
+
+@media (max-width: 520px) {
+  .time-panel {
     display: none;
   }
 }

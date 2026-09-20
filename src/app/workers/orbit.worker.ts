@@ -5,15 +5,20 @@ import {
   SatRecError,
   degreesLat,
   degreesLong,
+  ecfToLookAngles,
   eciToEcf,
   eciToGeodetic,
   gstime,
   json2satrec,
   propagate,
 } from 'satellite.js';
-import type { OMMJsonObject } from 'satellite.js';
+import type { GeodeticLocation, OMMJsonObject } from 'satellite.js';
+import { ObserverLocation } from '../models/observer.model';
 import { SatelliteRecord } from '../models/satellite.model';
 import { EARTH_EQUATORIAL_RADIUS_KM } from '../orbital/coordinate-converter';
+import { observerLocationToGeodetic } from '../orbital/observer-geometry';
+import { projectWorldPositionToEarth } from '../orbital/orbital-context';
+import { predictPassFromElevation } from '../orbital/pass-predictor';
 import {
   OrbitWorkerRequest,
   OrbitWorkerResponse,
@@ -26,6 +31,7 @@ const scope = self as DedicatedWorkerGlobalScope;
 let records: SatelliteRecord[] = [];
 let satrecs: Array<SatRec | null> = [];
 let selectedIndex: number | null = null;
+let observerGeodetic: GeodeticLocation | null = null;
 
 scope.addEventListener('message', ({ data }: MessageEvent<OrbitWorkerRequest>) => {
   try {
@@ -39,8 +45,14 @@ scope.addEventListener('message', ({ data }: MessageEvent<OrbitWorkerRequest>) =
       case 'select':
         selectedIndex = data.index;
         break;
-      case 'orbit':
-        calculateOrbit(data.index, data.timestampMs);
+      case 'observer':
+        setObserver(data.location);
+        break;
+      case 'predict-pass':
+        calculatePass(data.index, data.timestampMs);
+        break;
+      case 'trajectory':
+        calculateTrajectory(data.index, data.timestampMs);
         break;
     }
   } catch (error) {
@@ -80,6 +92,8 @@ function propagateCatalog(timestampMs: number, reusableBuffer?: ArrayBuffer): vo
   const gmstRadians = gstime(timestamp);
   let failedCount = 0;
   let selectedTelemetry: WorkerSatelliteTelemetry | null = null;
+  let selectedObserverLook: import('./orbit-worker.types').WorkerSelectedObserverLook | null = null;
+  const aboveHorizon: number[] = [];
 
   for (let index = 0; index < satrecs.length; index += 1) {
     const satrec = satrecs[index];
@@ -102,6 +116,22 @@ function propagateCatalog(timestampMs: number, reusableBuffer?: ArrayBuffer): vo
     positions[offset + 1] = ecf.z / EARTH_EQUATORIAL_RADIUS_KM;
     positions[offset + 2] = -ecf.y / EARTH_EQUATORIAL_RADIUS_KM;
 
+    if (observerGeodetic) {
+      const look = ecfToLookAngles(observerGeodetic, ecf);
+      if (look.elevation > 0) {
+        aboveHorizon.push(index, look.azimuth, look.elevation, look.rangeSat);
+      }
+      if (index === selectedIndex) {
+        selectedObserverLook = {
+          index,
+          azimuthRad: look.azimuth,
+          elevationRad: look.elevation,
+          rangeKm: look.rangeSat,
+          trend: calculateElevationTrend(satrec, timestampMs, observerGeodetic),
+        };
+      }
+    }
+
     if (index === selectedIndex) {
       const geodetic = eciToGeodetic(result.position, gmstRadians);
       const record = records[index];
@@ -121,29 +151,93 @@ function propagateCatalog(timestampMs: number, reusableBuffer?: ArrayBuffer): vo
     }
   }
 
+  const observerData = new Float32Array(aboveHorizon);
   post(
     {
       type: 'frame',
       positionsBuffer: positions.buffer,
+      observerBuffer: observerData.buffer,
       selectedTelemetry,
+      selectedObserverLook,
       failedCount,
       calculationMs: performance.now() - startedAt,
     },
-    [positions.buffer],
+    [positions.buffer, observerData.buffer],
   );
 }
 
-function calculateOrbit(index: number, timestampMs: number): void {
+function setObserver(location: ObserverLocation | null): void {
+  observerGeodetic = location ? observerLocationToGeodetic(location) : null;
+}
+
+function calculateElevationTrend(
+  satrec: SatRec,
+  timestampMs: number,
+  observer: GeodeticLocation,
+): 'RISING' | 'SETTING' | 'NEAR MAX' {
+  const before = elevationAt(satrec, timestampMs - 30_000, observer);
+  const after = elevationAt(satrec, timestampMs + 30_000, observer);
+  if (before === null || after === null || Math.abs(after - before) < 0.0014) return 'NEAR MAX';
+  return after > before ? 'RISING' : 'SETTING';
+}
+
+function calculatePass(index: number, timestampMs: number): void {
+  const satrec = satrecs[index];
+  if (!satrec || !observerGeodetic) {
+    post({
+      type: 'pass',
+      prediction: {
+        index,
+        status: 'NONE',
+        riseTimeMs: null,
+        maxElevationTimeMs: null,
+        maxElevationDeg: null,
+        setTimeMs: null,
+      },
+    });
+    return;
+  }
+
+  const result = predictPassFromElevation(timestampMs, (sampleTimeMs) => {
+    const elevation = elevationAt(satrec, sampleTimeMs, observerGeodetic!);
+    return elevation === null ? null : (elevation * 180) / Math.PI;
+  });
+  post({ type: 'pass', prediction: { index, ...result } });
+}
+
+function elevationAt(
+  satrec: SatRec,
+  timestampMs: number,
+  observer: GeodeticLocation,
+): number | null {
+  const timestamp = new Date(timestampMs);
+  const result = propagate(satrec, timestamp);
+  if (!result || satrec.error !== SatRecError.None) return null;
+  const ecf = eciToEcf(result.position, gstime(timestamp));
+  return ecfToLookAngles(observer, ecf).elevation;
+}
+
+function calculateTrajectory(index: number, timestampMs: number): void {
   const satrec = satrecs[index];
   const record = records[index];
   if (!satrec || !record) {
-    const emptyPath = new Float32Array();
-    post({ type: 'orbit', index, positionsBuffer: emptyPath.buffer }, [emptyPath.buffer]);
+    const emptyOrbit = new Float32Array();
+    const emptyGroundTrack = new Float32Array();
+    post(
+      {
+        type: 'trajectory',
+        index,
+        orbitPositionsBuffer: emptyOrbit.buffer,
+        groundTrackPositionsBuffer: emptyGroundTrack.buffer,
+      },
+      [emptyOrbit.buffer, emptyGroundTrack.buffer],
+    );
     return;
   }
 
   const periodMs = 86_400_000 / record.meanMotion;
-  const positions: number[] = [];
+  const orbitPositions: number[] = [];
+  const groundTrackPositions: number[] = [];
   for (let sample = 0; sample < ORBIT_SAMPLE_COUNT; sample += 1) {
     const progress = sample / (ORBIT_SAMPLE_COUNT - 1) - 0.5;
     const timestamp = new Date(timestampMs + periodMs * progress);
@@ -151,15 +245,26 @@ function calculateOrbit(index: number, timestampMs: number): void {
     if (!result || satrec.error !== SatRecError.None) continue;
 
     const ecf = eciToEcf(result.position, gstime(timestamp));
-    positions.push(
-      ecf.x / EARTH_EQUATORIAL_RADIUS_KM,
-      ecf.z / EARTH_EQUATORIAL_RADIUS_KM,
-      -ecf.y / EARTH_EQUATORIAL_RADIUS_KM,
-    );
+    const worldX = ecf.x / EARTH_EQUATORIAL_RADIUS_KM;
+    const worldY = ecf.z / EARTH_EQUATORIAL_RADIUS_KM;
+    const worldZ = -ecf.y / EARTH_EQUATORIAL_RADIUS_KM;
+    orbitPositions.push(worldX, worldY, worldZ);
+
+    const ground = projectWorldPositionToEarth({ x: worldX, y: worldY, z: worldZ });
+    groundTrackPositions.push(ground.x, ground.y, ground.z);
   }
 
-  const path = new Float32Array(positions);
-  post({ type: 'orbit', index, positionsBuffer: path.buffer }, [path.buffer]);
+  const orbitPath = new Float32Array(orbitPositions);
+  const groundTrackPath = new Float32Array(groundTrackPositions);
+  post(
+    {
+      type: 'trajectory',
+      index,
+      orbitPositionsBuffer: orbitPath.buffer,
+      groundTrackPositionsBuffer: groundTrackPath.buffer,
+    },
+    [orbitPath.buffer, groundTrackPath.buffer],
+  );
 }
 
 function toOmm(record: SatelliteRecord): OMMJsonObject {

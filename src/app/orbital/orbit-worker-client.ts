@@ -1,4 +1,11 @@
+import {
+  ObserverLocation,
+  ObserverSatelliteLook,
+  SatellitePassPrediction,
+  SelectedObserverLook,
+} from '../models/observer.model';
 import { SatelliteRecord, SatelliteTelemetry } from '../models/satellite.model';
+import { azimuthToCardinal } from './observer-geometry';
 import {
   OrbitWorkerRequest,
   OrbitWorkerResponse,
@@ -12,9 +19,16 @@ export interface OrbitWorkerCallbacks {
   onFrame(
     positions: Float32Array,
     telemetry: SatelliteTelemetry | null,
+    observerSatellites: ObserverSatelliteLook[],
+    selectedObserverLook: SelectedObserverLook | null,
     stats: { failedCount: number; calculationMs: number },
   ): void;
-  onOrbit(index: number, positions: Float32Array): void;
+  onTrajectory(
+    index: number,
+    orbitPositions: Float32Array,
+    groundTrackPositions: Float32Array,
+  ): void;
+  onPass(prediction: SatellitePassPrediction): void;
   onError(error: Error): void;
 }
 
@@ -43,8 +57,20 @@ export class OrbitWorkerClient {
     this.post({ type: 'select', index });
   }
 
-  requestOrbit(index: number): void {
-    this.post({ type: 'orbit', index, timestampMs: this.timeProvider().getTime() });
+  setObserver(location: ObserverLocation | null): void {
+    this.post({ type: 'observer', location });
+  }
+
+  requestPass(index: number): number {
+    const timestampMs = this.timeProvider().getTime();
+    this.post({ type: 'predict-pass', index, timestampMs });
+    return timestampMs;
+  }
+
+  requestTrajectory(index: number): number {
+    const request = createTrajectoryRequest(index, this.timeProvider);
+    this.post(request);
+    return request.timestampMs;
   }
 
   dispose(): void {
@@ -68,7 +94,7 @@ export class OrbitWorkerClient {
     const positionsBuffer = this.positionsBuffer;
     this.positionsBuffer = undefined;
     this.post(
-      { type: 'propagate', timestampMs: this.timeProvider().getTime(), positionsBuffer },
+      createPropagationRequest(this.timeProvider, positionsBuffer),
       positionsBuffer ? [positionsBuffer] : [],
     );
   }
@@ -83,16 +109,29 @@ export class OrbitWorkerClient {
         break;
       case 'frame': {
         const positions = new Float32Array(data.positionsBuffer);
-        this.callbacks.onFrame(positions, toTelemetry(data.selectedTelemetry), {
-          failedCount: data.failedCount,
-          calculationMs: data.calculationMs,
-        });
+        this.callbacks.onFrame(
+          positions,
+          toTelemetry(data.selectedTelemetry),
+          unpackObserverSatellites(data.observerBuffer),
+          toSelectedObserverLook(data.selectedObserverLook),
+          {
+            failedCount: data.failedCount,
+            calculationMs: data.calculationMs,
+          },
+        );
         this.positionsBuffer = data.positionsBuffer;
         this.propagationPending = false;
         break;
       }
-      case 'orbit':
-        this.callbacks.onOrbit(data.index, new Float32Array(data.positionsBuffer));
+      case 'trajectory':
+        this.callbacks.onTrajectory(
+          data.index,
+          new Float32Array(data.orbitPositionsBuffer),
+          new Float32Array(data.groundTrackPositionsBuffer),
+        );
+        break;
+      case 'pass':
+        this.callbacks.onPass(toPassPrediction(data.prediction));
         break;
       case 'error':
         this.callbacks.onError(new Error(data.message));
@@ -109,6 +148,64 @@ export class OrbitWorkerClient {
   private post(message: OrbitWorkerRequest, transfer: Transferable[] = []): void {
     this.worker.postMessage(message, transfer);
   }
+}
+
+const RADIANS_TO_DEGREES = 180 / Math.PI;
+
+function unpackObserverSatellites(buffer: ArrayBuffer): ObserverSatelliteLook[] {
+  const packed = new Float32Array(buffer);
+  const satellites: ObserverSatelliteLook[] = [];
+  for (let offset = 0; offset + 3 < packed.length; offset += 4) {
+    satellites.push({
+      index: packed[offset],
+      azimuthDeg: packed[offset + 1] * RADIANS_TO_DEGREES,
+      elevationDeg: packed[offset + 2] * RADIANS_TO_DEGREES,
+      rangeKm: packed[offset + 3],
+    });
+  }
+  return satellites;
+}
+
+function toSelectedObserverLook(
+  value: import('../workers/orbit-worker.types').WorkerSelectedObserverLook | null,
+): SelectedObserverLook | null {
+  if (!value) return null;
+  const azimuthDeg = value.azimuthRad * RADIANS_TO_DEGREES;
+  return {
+    index: value.index,
+    azimuthDeg,
+    elevationDeg: value.elevationRad * RADIANS_TO_DEGREES,
+    rangeKm: value.rangeKm,
+    direction: azimuthToCardinal(azimuthDeg),
+    trend: value.trend,
+  };
+}
+
+function toPassPrediction(
+  value: import('../workers/orbit-worker.types').WorkerPassPrediction,
+): SatellitePassPrediction {
+  return {
+    index: value.index,
+    status: value.status,
+    riseTime: value.riseTimeMs === null ? null : new Date(value.riseTimeMs),
+    maxElevationTime: value.maxElevationTimeMs === null ? null : new Date(value.maxElevationTimeMs),
+    maxElevationDeg: value.maxElevationDeg,
+    setTime: value.setTimeMs === null ? null : new Date(value.setTimeMs),
+  };
+}
+
+export function createPropagationRequest(
+  timeProvider: () => Date,
+  positionsBuffer?: ArrayBuffer,
+): Extract<OrbitWorkerRequest, { type: 'propagate' }> {
+  return { type: 'propagate', timestampMs: timeProvider().getTime(), positionsBuffer };
+}
+
+export function createTrajectoryRequest(
+  index: number,
+  timeProvider: () => Date,
+): Extract<OrbitWorkerRequest, { type: 'trajectory' }> {
+  return { type: 'trajectory', index, timestampMs: timeProvider().getTime() };
 }
 
 function toTelemetry(value: WorkerSatelliteTelemetry | null): SatelliteTelemetry | null {

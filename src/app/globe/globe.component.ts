@@ -14,6 +14,7 @@ import { ReticleLocationService } from '../core/reticle-location.service';
 import { ObserverLocationService } from '../core/observer-location.service';
 import { SatelliteStateService } from '../core/satellite-state.service';
 import { SimulationTimeService } from '../core/simulation-time.service';
+import { ShowcaseService } from '../core/showcase.service';
 import { OrbitWorkerClient } from '../orbital/orbit-worker-client';
 import { GlobeEngine } from './globe-engine';
 
@@ -30,6 +31,8 @@ export class GlobeComponent implements AfterViewInit, OnDestroy {
   private readonly canvas!: ElementRef<HTMLCanvasElement>;
   @ViewChild('satelliteLabel', { static: true })
   private readonly satelliteLabel!: ElementRef<HTMLElement>;
+  @ViewChild('hoverLabel', { static: true })
+  private readonly hoverLabel!: ElementRef<HTMLElement>;
 
   private readonly ngZone = inject(NgZone);
   private readonly document = inject(DOCUMENT);
@@ -38,6 +41,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy {
   private readonly reticleLocation = inject(ReticleLocationService);
   private readonly satelliteState = inject(SatelliteStateService);
   private readonly simulationTime = inject(SimulationTimeService);
+  private readonly showcase = inject(ShowcaseService);
   private engine?: GlobeEngine;
   private orbitWorker?: OrbitWorkerClient;
   private lastTelemetryUpdateAtMs = Number.NEGATIVE_INFINITY;
@@ -97,6 +101,11 @@ export class GlobeComponent implements AfterViewInit, OnDestroy {
     if (request > 0) this.engine?.cancelCameraMotion();
   });
 
+  private readonly cameraPresetEffect = effect(() => {
+    const request = this.showcase.cameraRequest();
+    if (request.sequence > 0) this.engine?.transitionToCameraPreset(request.preset);
+  });
+
   private readonly simulationTimeEffect = effect(() => {
     const timestamp = this.simulationTime.currentTime();
     this.engine?.setSimulationTime(timestamp);
@@ -130,16 +139,26 @@ export class GlobeComponent implements AfterViewInit, OnDestroy {
       this.engine = new GlobeEngine(
         this.canvas.nativeElement,
         this.satelliteLabel.nativeElement,
+        this.hoverLabel.nativeElement,
         this.document.baseURI,
         this.simulationTime.now(),
         (coordinates) => {
           this.ngZone.run(() => this.reticleLocation.updateCoordinates(coordinates));
         },
         (index) => {
-          this.ngZone.run(() => this.satelliteState.select(index));
+          this.ngZone.run(() => {
+            this.showcase.registerManualInteraction();
+            this.satelliteState.select(index);
+          });
         },
         () => {
           this.ngZone.run(() => this.satelliteState.stopFollow());
+        },
+        (hovered) => {
+          this.ngZone.run(() => this.satelliteState.setHoveredSatellite(hovered));
+        },
+        () => {
+          this.ngZone.run(() => this.showcase.registerManualInteraction());
         },
       );
       this.engine.start();

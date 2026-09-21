@@ -25,8 +25,8 @@
 
 .eyebrow,
 .telemetry {
-  color: rgba(177, 199, 211, 0.65);
-  font-size: clamp(0.58rem, 1.3vw, 0.68rem);
+  color: rgba(194, 213, 223, 0.8);
+  font-size: clamp(0.68rem, 1.3vw, 0.76rem);
   line-height: 1.2;
 }
 
@@ -68,13 +68,162 @@
 
 .hud-panel {
   position: absolute;
-  width: min(17.5rem, calc(100vw - 2rem));
+  width: min(19rem, calc(100vw - 2rem));
   padding: 0.8rem 0.9rem 0.85rem;
-  border: 1px solid rgba(157, 194, 214, 0.2);
-  background: linear-gradient(135deg, rgba(5, 13, 19, 0.8), rgba(5, 13, 19, 0.46));
+  border: 1px solid rgba(157, 194, 214, 0.3);
+  background: linear-gradient(135deg, rgba(5, 13, 19, 0.94), rgba(5, 13, 19, 0.78));
   backdrop-filter: blur(0.35rem);
-  font-size: 0.58rem;
+  font-size: 0.7rem;
   font-variant-numeric: tabular-nums;
+}
+
+.showcase-panel {
+  top: clamp(6.3rem, 12vh, 7.8rem);
+  left: 50%;
+  width: min(34rem, calc(100vw - 40rem));
+  min-width: 28rem;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  transition:
+    width 180ms ease,
+    min-width 180ms ease;
+}
+
+.showcase-panel.is-collapsed {
+  width: 19rem;
+  min-width: 0;
+  padding-block: 0.62rem;
+}
+
+.showcase-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.showcase-title {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.24rem;
+  color: rgba(224, 238, 244, 0.94);
+}
+
+.showcase-title small {
+  overflow: hidden;
+  color: rgba(194, 213, 223, 0.76);
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.showcase-heading-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.3rem;
+}
+
+.home-button,
+.collapse-button,
+.exit-tour-button {
+  padding: 0.18rem 0.4rem;
+  border-color: rgba(114, 211, 239, 0.28);
+  font-size: 0.6rem;
+}
+
+.exit-tour-button {
+  border-color: rgba(227, 173, 139, 0.42);
+  color: rgba(238, 194, 163, 0.9);
+}
+
+.quick-views-intro {
+  margin: 0.62rem 0 0;
+  padding-top: 0.58rem;
+  border-top: 1px solid rgba(157, 194, 214, 0.14);
+  color: rgba(201, 218, 227, 0.82);
+  font-size: 0.64rem;
+  line-height: 1.45;
+  text-transform: none;
+}
+
+.preset-controls {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.32rem;
+  margin-top: 0.62rem;
+}
+
+.preset-controls button {
+  display: flex;
+  min-width: 0;
+  min-height: 3.1rem;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.28rem;
+  padding: 0.42rem 0.5rem;
+  overflow: hidden;
+  font-size: 0.64rem;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+
+.preset-controls button span {
+  color: rgba(230, 242, 247, 0.96);
+}
+
+.preset-controls button small {
+  color: rgba(194, 213, 223, 0.74);
+  font-size: 0.61rem;
+  line-height: 1.35;
+  text-transform: none;
+}
+
+.guided-tour-callout,
+.tour-running {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 0.58rem;
+  padding-top: 0.58rem;
+  border-top: 1px solid rgba(157, 194, 214, 0.14);
+}
+
+.guided-tour-callout {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.guided-tour-callout > div,
+.tour-running {
+  flex-direction: column;
+}
+
+.guided-tour-callout > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.guided-tour-callout strong,
+.tour-running strong {
+  color: rgba(226, 240, 246, 0.94);
+  font-size: 0.64rem;
+  font-weight: 500;
+}
+
+.guided-tour-callout span,
+.tour-running span {
+  color: rgba(194, 213, 223, 0.76);
+  font-size: 0.61rem;
+  line-height: 1.4;
+  text-transform: none;
+}
+
+.guided-tour-callout button {
+  flex: 0 0 auto;
+  padding: 0.42rem 0.5rem;
+  border-color: rgba(114, 211, 239, 0.42);
+  color: #bcebf8;
 }
 
 .command-panel {
@@ -93,7 +242,7 @@
   display: block;
   padding: 0.7rem 0;
   color: rgba(230, 241, 246, 0.9);
-  font-size: 0.68rem;
+  font-size: 0.76rem;
   text-align: center;
 }
 
@@ -116,14 +265,14 @@
 .speed-controls button {
   min-width: 0;
   padding: 0.38rem 0.15rem;
-  font-size: 0.48rem;
+  font-size: 0.6rem;
 }
 
 .shortcut-hint {
   display: block;
   margin-top: 0.55rem;
-  color: rgba(177, 199, 211, 0.38);
-  font-size: 0.43rem;
+  color: rgba(194, 213, 223, 0.66);
+  font-size: 0.6rem;
   line-height: 1.4;
   text-align: center;
   text-transform: none;
@@ -138,7 +287,7 @@
 .surface-panel {
   right: clamp(1rem, 3vw, 2.5rem);
   bottom: clamp(1rem, 3vw, 2.5rem);
-  background: linear-gradient(225deg, rgba(5, 13, 19, 0.8), rgba(5, 13, 19, 0.46));
+  background: linear-gradient(225deg, rgba(5, 13, 19, 0.94), rgba(5, 13, 19, 0.78));
 }
 
 .observer-panel {
@@ -147,7 +296,7 @@
   max-height: calc(100vh - 22rem);
   overflow-y: auto;
   pointer-events: auto;
-  background: linear-gradient(225deg, rgba(5, 13, 19, 0.9), rgba(5, 13, 19, 0.58));
+  background: linear-gradient(225deg, rgba(5, 13, 19, 0.96), rgba(5, 13, 19, 0.82));
 }
 
 .panel-heading {
@@ -157,13 +306,13 @@
   gap: 0.8rem;
   padding-bottom: 0.62rem;
   border-bottom: 1px solid rgba(157, 194, 214, 0.16);
-  color: rgba(211, 229, 237, 0.82);
+  color: rgba(224, 238, 244, 0.94);
 }
 
 .catalog-status,
 .panel-heading > :last-child {
-  color: rgba(177, 199, 211, 0.52);
-  font-size: 0.5rem;
+  color: rgba(194, 213, 223, 0.74);
+  font-size: 0.61rem;
 }
 
 .catalog-status.is-ready {
@@ -196,7 +345,7 @@
 .selected-grid dt,
 .surface-grid dt,
 .address-label {
-  color: rgba(177, 199, 211, 0.5);
+  color: rgba(194, 213, 223, 0.72);
 }
 
 .command-stats dd,
@@ -222,8 +371,8 @@
   margin-top: 0.65rem;
   padding-top: 0.65rem;
   border-top: 1px solid rgba(157, 194, 214, 0.16);
-  color: rgba(177, 199, 211, 0.5);
-  font-size: 0.5rem;
+  color: rgba(194, 213, 223, 0.72);
+  font-size: 0.62rem;
 }
 
 .visualization-controls > div {
@@ -234,7 +383,7 @@
 
 .visualization-controls button {
   padding: 0.34rem 0.2rem;
-  font-size: 0.46rem;
+  font-size: 0.61rem;
 }
 
 .visualization-controls .reference-toggle {
@@ -246,8 +395,8 @@
   flex-direction: column;
   gap: 0.25rem;
   margin-top: 0.55rem;
-  color: rgba(177, 199, 211, 0.48);
-  font-size: 0.43rem;
+  color: rgba(194, 213, 223, 0.72);
+  font-size: 0.6rem;
 }
 
 .altitude-legend > span {
@@ -263,8 +412,8 @@
 button,
 input {
   border: 1px solid rgba(157, 194, 214, 0.22);
-  background: rgba(7, 18, 25, 0.72);
-  color: rgba(208, 227, 236, 0.76);
+  background: rgba(7, 18, 25, 0.88);
+  color: rgba(222, 237, 244, 0.9);
   font: inherit;
   letter-spacing: inherit;
   text-transform: uppercase;
@@ -289,7 +438,7 @@ button.is-active {
 .filter-button {
   min-width: 0;
   padding: 0.35rem 0.2rem;
-  font-size: 0.46rem;
+  font-size: 0.61rem;
 }
 
 .search-field {
@@ -297,8 +446,8 @@ button.is-active {
   flex-direction: column;
   gap: 0.38rem;
   margin-top: 0.72rem;
-  color: rgba(177, 199, 211, 0.5);
-  font-size: 0.5rem;
+  color: rgba(194, 213, 223, 0.72);
+  font-size: 0.62rem;
 }
 
 .search-field input {
@@ -339,7 +488,7 @@ button.is-active {
 .selected-name {
   overflow: hidden;
   color: #effaff;
-  font-size: 0.68rem;
+  font-size: 0.76rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -363,8 +512,8 @@ button.is-active {
   gap: 0.28rem;
   padding-top: 0.6rem;
   border-top: 1px solid rgba(157, 194, 214, 0.16);
-  color: rgba(177, 199, 211, 0.55);
-  font-size: 0.5rem;
+  color: rgba(194, 213, 223, 0.74);
+  font-size: 0.61rem;
   line-height: 1.35;
 }
 
@@ -383,9 +532,41 @@ button.is-active {
   min-height: 3.5rem;
   margin: 0;
   padding-top: 0.8rem;
-  color: rgba(177, 199, 211, 0.5);
-  font-size: 0.55rem;
+  color: rgba(194, 213, 223, 0.74);
+  font-size: 0.65rem;
   line-height: 1.5;
+}
+
+.is-tracking {
+  color: #75dfaa !important;
+}
+
+.hover-acquisition {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.38rem 0.75rem;
+  min-height: 3.5rem;
+  padding-top: 0.72rem;
+}
+
+.hover-acquisition strong {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: #effaff;
+  font-size: 0.76rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hover-acquisition span {
+  color: rgba(215, 232, 239, 0.88);
+}
+
+.hover-acquisition small {
+  grid-column: 1 / -1;
+  color: rgba(194, 213, 223, 0.72);
+  font-size: 0.6rem;
 }
 
 .reticle {
@@ -397,6 +578,7 @@ button.is-active {
   transform: translate(-50%, -50%);
   border: 1px solid rgba(153, 196, 219, 0.11);
   border-radius: 50%;
+  pointer-events: none;
 }
 
 .reticle::before,
@@ -441,8 +623,8 @@ button.is-active {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  color: rgba(177, 199, 211, 0.5);
-  font-size: 0.48rem;
+  color: rgba(194, 213, 223, 0.72);
+  font-size: 0.6rem;
 }
 
 .manual-location input {
@@ -459,7 +641,7 @@ button.is-active {
 .observer-error {
   margin: 0.55rem 0 0;
   color: #e4aa94;
-  font-size: 0.48rem;
+  font-size: 0.61rem;
   line-height: 1.4;
   text-transform: none;
 }
@@ -467,8 +649,8 @@ button.is-active {
 .privacy-note {
   display: block;
   margin-top: 0.55rem;
-  color: rgba(177, 199, 211, 0.42);
-  font-size: 0.45rem;
+  color: rgba(194, 213, 223, 0.68);
+  font-size: 0.6rem;
   text-align: center;
   text-transform: none;
 }
@@ -493,7 +675,7 @@ button.is-active {
 
 .address-secondary,
 .address-status {
-  color: rgba(177, 199, 211, 0.62);
+  color: rgba(194, 213, 223, 0.78);
 }
 
 .map-link {
@@ -511,14 +693,86 @@ button.is-active {
 .attribution {
   display: block;
   margin-top: 0.52rem;
-  color: rgba(177, 199, 211, 0.38);
-  font-size: 0.45rem;
+  color: rgba(194, 213, 223, 0.64);
+  font-size: 0.6rem;
   text-transform: none;
 }
 
 .attribution a {
   color: inherit;
   pointer-events: auto;
+}
+
+.intro-affordance {
+  bottom: clamp(1rem, 3vw, 2.5rem);
+  left: 50%;
+  width: min(27rem, calc(100vw - 2rem));
+  transform: translateX(-50%);
+  pointer-events: auto;
+  text-align: center;
+}
+
+.intro-affordance strong,
+.intro-affordance > span {
+  display: block;
+}
+
+.intro-affordance strong {
+  color: #ecf8fc;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+}
+
+.intro-affordance > span {
+  margin-top: 0.36rem;
+  color: rgba(201, 218, 227, 0.82);
+  font-size: 0.64rem;
+}
+
+.intro-affordance > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin-top: 0.68rem;
+}
+
+.intro-affordance button {
+  padding: 0.48rem;
+}
+
+// Telemetry remains compact, but no functional or explanatory HUD copy drops
+// below an approximately 11px reading size at the browser default scale.
+.showcase-title small,
+.home-button,
+.collapse-button,
+.exit-tour-button,
+.quick-views-intro,
+.preset-controls button,
+.preset-controls button small,
+.guided-tour-callout strong,
+.guided-tour-callout span,
+.tour-running strong,
+.tour-running span,
+.time-actions button,
+.speed-controls button,
+.shortcut-hint,
+.catalog-status,
+.panel-heading > :last-child,
+.visualization-controls,
+.visualization-controls button,
+.altitude-legend,
+.filter-button,
+.search-field,
+.target-meta,
+.empty-state,
+.hover-acquisition small,
+.manual-location label,
+.observer-error,
+.privacy-note,
+.attribution,
+.intro-affordance > span {
+  font-size: 0.68rem;
 }
 
 @media (max-height: 760px) and (min-width: 721px) {
@@ -536,6 +790,10 @@ button.is-active {
 }
 
 @media (max-width: 720px) {
+  .showcase-panel {
+    display: none;
+  }
+
   .command-panel {
     top: 5rem;
     left: 1rem;
@@ -563,6 +821,19 @@ button.is-active {
     bottom: 1rem;
     width: 13rem;
     max-height: 48vh;
+  }
+}
+
+@media (max-width: 1180px) and (min-width: 721px) {
+  .showcase-panel {
+    top: auto;
+    bottom: 1rem;
+    width: min(30rem, calc(100vw - 40rem));
+    min-width: 24rem;
+  }
+
+  .intro-affordance {
+    bottom: 9rem;
   }
 }
 

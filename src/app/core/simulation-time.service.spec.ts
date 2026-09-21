@@ -56,4 +56,28 @@ describe('SimulationTimeService', () => {
     expect(service.speedMultiplier()).toBe(1);
     expect(service.now().getTime()).toBe(Date.now());
   });
+
+  it('restores a captured simulated clock without accumulating stopped wall time', () => {
+    service.restore({
+      currentTime: new Date('2030-01-01T00:00:00Z'),
+      mode: 'simulation',
+      speedMultiplier: 100,
+    });
+    vi.advanceTimersByTime(250);
+
+    expect(service.now().toISOString()).toBe('2030-01-01T00:00:25.000Z');
+    expect(service.speedMultiplier()).toBe(100);
+  });
+
+  it('restores a paused clock at the exact captured instant', () => {
+    service.restore({
+      currentTime: new Date('2030-01-01T00:00:00Z'),
+      mode: 'paused',
+      speedMultiplier: 1_000,
+    });
+    vi.advanceTimersByTime(60_000);
+
+    expect(service.now().toISOString()).toBe('2030-01-01T00:00:00.000Z');
+    expect(service.mode()).toBe('paused');
+  });
 });

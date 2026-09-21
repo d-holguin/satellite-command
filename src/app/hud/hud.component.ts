@@ -11,6 +11,7 @@ import { ObserverLocationService } from '../core/observer-location.service';
 import { ReticleLocationService } from '../core/reticle-location.service';
 import { SatelliteStateService } from '../core/satellite-state.service';
 import { SimulationTimeService } from '../core/simulation-time.service';
+import { ShowcaseService } from '../core/showcase.service';
 import {
   SATELLITE_CATEGORIES,
   SatelliteColorMode,
@@ -35,6 +36,7 @@ export class HudComponent {
   private readonly satelliteState = inject(SatelliteStateService);
   private readonly reticleLocation = inject(ReticleLocationService);
   private readonly observer = inject(ObserverLocationService);
+  private readonly showcase = inject(ShowcaseService);
 
   protected readonly currentTime = this.simulationTime.currentTime;
   protected readonly simulationMode = this.simulationTime.mode;
@@ -80,6 +82,14 @@ export class HudComponent {
   protected readonly manualLatitude = signal('');
   protected readonly manualLongitude = signal('');
   protected readonly manualError = signal<string | null>(null);
+  protected readonly quickViewsExpanded = signal(false);
+  protected readonly hoveredSatellite = this.satelliteState.hoveredSatellite;
+  protected readonly hoveredRecord = this.satelliteState.hoveredRecord;
+  protected readonly visualizationPresets = this.showcase.presets;
+  protected readonly activePresetId = this.showcase.activePresetId;
+  protected readonly demoActive = this.showcase.demoActive;
+  protected readonly demoStage = this.showcase.demoStage;
+  protected readonly introVisible = this.showcase.introVisible;
 
   protected formatLatitude(value: number): string {
     return `${Math.abs(value).toFixed(3)}° ${value >= 0 ? 'N' : 'S'}`;
@@ -107,46 +117,57 @@ export class HudComponent {
   }
 
   protected returnToLive(): void {
+    this.registerManualInteraction();
     this.simulationTime.returnToLive();
   }
 
   protected togglePause(): void {
+    this.registerManualInteraction();
     this.simulationTime.togglePause();
   }
 
   protected setSpeed(speed: SimulationSpeed): void {
+    this.registerManualInteraction();
     this.simulationTime.setSpeed(speed);
   }
 
   protected setFilter(filter: SatelliteFilter): void {
+    this.registerManualInteraction();
     this.satelliteState.setFilter(filter);
   }
 
   protected updateSearch(event: Event): void {
+    this.registerManualInteraction();
     this.satelliteState.setSearchQuery((event.target as HTMLInputElement).value);
   }
 
   protected selectSatellite(index: number): void {
+    this.registerManualInteraction();
     this.satelliteState.select(index);
   }
 
   protected clearSelection(): void {
+    this.registerManualInteraction();
     this.satelliteState.select(null);
   }
 
   protected toggleOrbit(): void {
+    this.registerManualInteraction();
     this.satelliteState.toggleOrbit();
   }
 
   protected toggleGroundTrack(): void {
+    this.registerManualInteraction();
     this.satelliteState.toggleGroundTrack();
   }
 
   protected toggleVisibilityFootprint(): void {
+    this.registerManualInteraction();
     this.satelliteState.toggleVisibilityFootprint();
   }
 
   protected toggleObserverMode(): void {
+    this.registerManualInteraction();
     if (this.observer.enabled()) {
       if (this.satelliteState.showVisibilityFootprint()) {
         this.satelliteState.toggleVisibilityFootprint();
@@ -158,18 +179,22 @@ export class HudComponent {
   }
 
   protected useBrowserLocation(): void {
+    this.registerManualInteraction();
     this.observer.useBrowserLocation();
   }
 
   protected updateManualLatitude(event: Event): void {
+    this.registerManualInteraction();
     this.manualLatitude.set((event.target as HTMLInputElement).value);
   }
 
   protected updateManualLongitude(event: Event): void {
+    this.registerManualInteraction();
     this.manualLongitude.set((event.target as HTMLInputElement).value);
   }
 
   protected applyManualLocation(): void {
+    this.registerManualInteraction();
     try {
       if (!this.manualLatitude().trim() || !this.manualLongitude().trim()) {
         throw new Error('Enter both latitude and longitude.');
@@ -187,23 +212,54 @@ export class HudComponent {
   }
 
   protected toggleAboveOnly(): void {
+    this.registerManualInteraction();
     this.observer.toggleAboveOnly();
   }
 
   protected toggleFollow(): void {
+    this.registerManualInteraction();
     this.satelliteState.toggleFollow();
   }
 
   protected setColorMode(mode: SatelliteColorMode): void {
+    this.registerManualInteraction();
     this.satelliteState.setColorMode(mode);
   }
 
   protected toggleReferenceOrbits(): void {
+    this.registerManualInteraction();
     this.satelliteState.toggleReferenceOrbits();
   }
 
   protected focusSatellite(): void {
+    this.registerManualInteraction();
     this.satelliteState.requestFocus();
+  }
+
+  protected applyPreset(id: string): void {
+    this.registerManualInteraction();
+    this.showcase.applyPreset(id);
+  }
+
+  protected startDemo(): void {
+    this.quickViewsExpanded.set(true);
+    this.showcase.startDemo();
+  }
+
+  protected exitDemo(): void {
+    this.showcase.exitDemo();
+  }
+
+  protected resetView(): void {
+    this.showcase.home();
+  }
+
+  protected explore(): void {
+    this.showcase.dismissIntro();
+  }
+
+  protected toggleQuickViews(): void {
+    this.quickViewsExpanded.update((expanded) => !expanded);
   }
 
   @HostListener('document:keydown', ['$event'])
@@ -236,8 +292,13 @@ export class HudComponent {
         this.toggleGroundTrack();
         break;
       case 'escape':
+        this.registerManualInteraction();
         this.satelliteState.exitCameraMode();
         break;
     }
+  }
+
+  private registerManualInteraction(): void {
+    this.showcase.registerManualInteraction();
   }
 }

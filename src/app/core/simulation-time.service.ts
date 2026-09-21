@@ -103,4 +103,20 @@ export class SimulationTimeService {
     });
     this.displayTimeState.set(new Date(nowMs));
   }
+
+  restore(state: SimulationClockState): void {
+    if (state.mode === 'live') {
+      this.returnToLive();
+      return;
+    }
+
+    const simulationBaseTimeMs = state.currentTime.getTime();
+    this.anchorState.set({
+      simulationBaseTimeMs,
+      realBaseTimeMs: Date.now(),
+      mode: state.mode,
+      speedMultiplier: state.speedMultiplier,
+    });
+    this.displayTimeState.set(new Date(simulationBaseTimeMs));
+  }
 }

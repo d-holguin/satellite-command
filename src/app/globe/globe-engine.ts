@@ -15,9 +15,12 @@ import {
 } from '../orbital/observer-geometry';
 import { sunDirectionEarthFixed } from '../orbital/sun-direction';
 import { EarthTextureLoader } from './earth-texture-loader';
+import { CAMERA_PRESETS } from './camera-presets';
+import { CameraPresetId, HoveredSatellite } from '../models/visualization.model';
 
 const EARTH_RADIUS = 1;
 const RETICLE_INTERVAL_MS = 250;
+const HOVER_INTERVAL_MS = 50;
 const SHOW_GEOGRAPHIC_VALIDATION_MARKERS = false;
 const REFERENCE_ALTITUDES_KM = [500, 2_000, 20_200, 35_786] as const;
 const FOOTPRINT_SEGMENTS = 128;
@@ -43,6 +46,7 @@ interface SatelliteCloud {
   positions: Float32Array;
   colors: Float32Array;
   visibility: Float32Array;
+  emphasis: Float32Array;
   aboveHorizon: Uint8Array;
   geometry: THREE.BufferGeometry;
   material: THREE.ShaderMaterial;
@@ -82,8 +86,10 @@ export class GlobeEngine {
   private readonly sightLine = new THREE.Vector3();
   private readonly reticleRaycaster = new THREE.Raycaster();
   private readonly pickingRaycaster = new THREE.Raycaster();
+  private readonly hoverRaycaster = new THREE.Raycaster();
   private readonly reticleNdc = new THREE.Vector2(0, 0);
   private readonly pointerNdc = new THREE.Vector2();
+  private readonly hoverPosition = new THREE.Vector3();
   private readonly followTarget = new THREE.Vector3();
   private readonly followDelta = new THREE.Vector3();
   private readonly selectedSurfacePosition = new THREE.Vector3();
@@ -155,6 +161,7 @@ export class GlobeEngine {
   private orbitLine?: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   private groundTrackLine?: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   private selectedIndex: number | null = null;
+  private hoveredIndex: number | null = null;
   private currentFilter: SatelliteFilter = 'ALL';
   private colorMode: SatelliteColorMode = 'CATEGORY';
   private observerAboveOnly = false;
@@ -163,23 +170,29 @@ export class GlobeEngine {
   private followEnabled = false;
   private focusTransition?: FocusTransition;
   private pointerDownPosition?: { x: number; y: number };
+  private pointerInside = false;
+  private hoverPending = false;
   private animationFrameId: number | null = null;
   private lastReticleUpdateAtMs = Number.NEGATIVE_INFINITY;
+  private lastHoverUpdateAtMs = Number.NEGATIVE_INFINITY;
   private disposed = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly satelliteLabel: HTMLElement,
+    private readonly hoverLabel: HTMLElement,
     assetBaseUri: string,
     initialSimulationTime: Date,
     private readonly onReticleCoordinates?: (coordinates: GeographicCoordinates) => void,
     private readonly onSatelliteSelected?: (index: number | null) => void,
     private readonly onFollowExited?: () => void,
+    private readonly onSatelliteHovered?: (hovered: HoveredSatellite | null) => void,
+    private readonly onManualCameraInteraction?: () => void,
   ) {
     this.scene.background = new THREE.Color(0x020509);
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.01, 500);
-    this.camera.position.set(0, 0.25, 3.25);
+    this.camera.position.fromArray(CAMERA_PRESETS.EARTH.position);
 
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
@@ -303,10 +316,13 @@ export class GlobeEngine {
     if (SHOW_GEOGRAPHIC_VALIDATION_MARKERS) this.addGeographicValidationMarkers();
 
     this.satelliteLabel.hidden = true;
+    this.hoverLabel.hidden = true;
     this.handleResize();
     window.addEventListener('resize', this.handleResize, { passive: true });
     this.canvas.addEventListener('pointerdown', this.handlePointerDown);
     this.canvas.addEventListener('pointerup', this.handlePointerUp);
+    this.canvas.addEventListener('pointermove', this.handlePointerMove, { passive: true });
+    this.canvas.addEventListener('pointerleave', this.handlePointerLeave, { passive: true });
     void this.loadEarthSurfaceTexture();
   }
 
@@ -317,6 +333,8 @@ export class GlobeEngine {
     positions.fill(Number.NaN);
     const colors = new Float32Array(records.length * 3);
     const visibility = new Float32Array(records.length);
+    const emphasis = new Float32Array(records.length);
+    emphasis.fill(1);
     const aboveHorizon = new Uint8Array(records.length);
 
     records.forEach((record, index) => {
@@ -333,40 +351,48 @@ export class GlobeEngine {
     colorAttribute.setUsage(THREE.DynamicDrawUsage);
     geometry.setAttribute('color', colorAttribute);
     geometry.setAttribute('visibility', new THREE.BufferAttribute(visibility, 1));
+    const emphasisAttribute = new THREE.BufferAttribute(emphasis, 1);
+    emphasisAttribute.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute('emphasis', emphasisAttribute);
     geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 200);
 
     const material = new THREE.ShaderMaterial({
       uniforms: {
-        pointSize: { value: 3.2 },
+        pointSize: { value: filter === 'ALL' ? 3.2 : 3.85 },
         pixelRatio: { value: this.renderer.getPixelRatio() },
       },
       vertexShader: `
         attribute vec3 color;
         attribute float visibility;
+        attribute float emphasis;
         varying vec3 vColor;
         varying float vVisibility;
+        varying float vEmphasis;
         uniform float pointSize;
         uniform float pixelRatio;
 
         void main() {
           vColor = color;
           vVisibility = visibility;
+          vEmphasis = emphasis;
           vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
           gl_Position = projectionMatrix * viewPosition;
           float distanceScale = 3.0 / max(-viewPosition.z, 0.1);
-          gl_PointSize = clamp(pointSize * pixelRatio * distanceScale, 1.5 * pixelRatio, 5.0 * pixelRatio);
+          gl_PointSize = clamp(pointSize * emphasis * pixelRatio * distanceScale, 1.5 * pixelRatio, 8.0 * pixelRatio);
         }
       `,
       fragmentShader: `
         varying vec3 vColor;
         varying float vVisibility;
+        varying float vEmphasis;
 
         void main() {
           if (vVisibility < 0.5) discard;
           float radius = distance(gl_PointCoord, vec2(0.5));
           if (radius > 0.5) discard;
           float alpha = smoothstep(0.5, 0.22, radius) * 0.9;
-          gl_FragColor = vec4(vColor, alpha);
+          vec3 displayColor = mix(vColor, vec3(0.9, 0.98, 1.0), clamp(vEmphasis - 1.0, 0.0, 1.0));
+          gl_FragColor = vec4(displayColor, alpha);
         }
       `,
       transparent: true,
@@ -384,6 +410,7 @@ export class GlobeEngine {
       positions,
       colors,
       visibility,
+      emphasis,
       aboveHorizon,
       geometry,
       material,
@@ -401,11 +428,18 @@ export class GlobeEngine {
     if (this.colorMode === 'ALTITUDE') this.updateAltitudeColors();
     this.updateSelectedMarkerPosition();
     this.updateObserverVisuals();
+    if (this.pointerInside) this.hoverPending = true;
   }
 
   setFilter(filter: SatelliteFilter): void {
     this.currentFilter = filter;
+    if (this.satelliteCloud) {
+      this.satelliteCloud.material.uniforms['pointSize'].value = filter === 'ALL' ? 3.2 : 3.85;
+    }
     this.applySatelliteVisibility();
+    if (this.hoveredIndex !== null && this.satelliteCloud?.visibility[this.hoveredIndex] !== 1) {
+      this.setHoveredIndex(null);
+    }
   }
 
   setObserverLocation(location: ObserverLocation | null): void {
@@ -485,6 +519,7 @@ export class GlobeEngine {
     this.selectedIndex = index;
     this.selectedAboveHorizon = false;
     this.satelliteLabel.hidden = true;
+    if (index === this.hoveredIndex) this.setHoveredIndex(null);
     this.clearOrbitPath();
     this.clearGroundTrack();
     this.setGroundContextVisible(false);
@@ -562,14 +597,21 @@ export class GlobeEngine {
     const halfSpan = (radius + EARTH_RADIUS) / 2;
     const viewDistance = (halfSpan / Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) * 1.2;
 
-    this.focusTransition = {
-      startedAtMs: performance.now(),
-      durationMs: 1_100,
-      cameraStart: this.camera.position.clone(),
-      cameraEnd: direction.clone().multiplyScalar(targetDistance + viewDistance),
-      targetStart: this.controls.target.clone(),
-      targetEnd: direction.multiplyScalar(targetDistance),
-    };
+    this.beginCameraTransition(
+      direction.clone().multiplyScalar(targetDistance + viewDistance),
+      direction.multiplyScalar(targetDistance),
+      1_100,
+    );
+  }
+
+  transitionToCameraPreset(presetId: CameraPresetId): void {
+    const preset = CAMERA_PRESETS[presetId];
+    this.followEnabled = false;
+    this.beginCameraTransition(
+      new THREE.Vector3().fromArray(preset.position),
+      new THREE.Vector3().fromArray(preset.target),
+      preset.durationMs,
+    );
   }
 
   start(): void {
@@ -583,6 +625,8 @@ export class GlobeEngine {
     window.removeEventListener('resize', this.handleResize);
     this.canvas.removeEventListener('pointerdown', this.handlePointerDown);
     this.canvas.removeEventListener('pointerup', this.handlePointerUp);
+    this.canvas.removeEventListener('pointermove', this.handlePointerMove);
+    this.canvas.removeEventListener('pointerleave', this.handlePointerLeave);
     this.controls.removeEventListener('start', this.handleControlsStart);
 
     if (this.animationFrameId !== null) cancelAnimationFrame(this.animationFrameId);
@@ -624,12 +668,14 @@ export class GlobeEngine {
   private readonly animate = (): void => {
     if (this.disposed) return;
 
-    this.controls.update();
     this.updateFocusTransition();
+    this.controls.update();
     this.updateFollow();
     this.updateViewLight();
     this.updateReticleLocation();
+    this.updateHoverAcquisition();
     this.updateSelectedVisual();
+    this.updateHoveredVisual();
     this.updateObserverMarkerScale();
     this.renderer.render(this.scene, this.camera);
     this.animationFrameId = requestAnimationFrame(this.animate);
@@ -776,6 +822,22 @@ export class GlobeEngine {
     this.pointerDownPosition = { x: event.clientX, y: event.clientY };
   };
 
+  private readonly handlePointerMove = (event: PointerEvent): void => {
+    const bounds = this.canvas.getBoundingClientRect();
+    this.pointerNdc.set(
+      ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+      -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
+    );
+    this.pointerInside = true;
+    this.hoverPending = true;
+  };
+
+  private readonly handlePointerLeave = (): void => {
+    this.pointerInside = false;
+    this.hoverPending = false;
+    this.setHoveredIndex(null);
+  };
+
   private readonly handlePointerUp = (event: PointerEvent): void => {
     const start = this.pointerDownPosition;
     this.pointerDownPosition = undefined;
@@ -795,7 +857,7 @@ export class GlobeEngine {
       -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
     );
     this.pickingRaycaster.params.Points = {
-      threshold: Math.max(0.025, this.camera.position.distanceTo(this.controls.target) * 0.006),
+      threshold: Math.max(0.04, this.camera.position.distanceTo(this.controls.target) * 0.008),
     };
     this.pickingRaycaster.setFromCamera(this.pointerNdc, this.camera);
 
@@ -805,7 +867,8 @@ export class GlobeEngine {
       if (
         index !== undefined &&
         cloud.visibility[index] > 0 &&
-        !this.isOccludedByEarth(intersection.point)
+        Boolean(this.readSatellitePosition(index, this.hoverPosition)) &&
+        !this.isOccludedByEarth(this.hoverPosition)
       ) {
         this.onSatelliteSelected?.(index);
         return;
@@ -843,7 +906,7 @@ export class GlobeEngine {
       (performance.now() - transition.startedAtMs) / transition.durationMs,
       1,
     );
-    const eased = progress * progress * (3 - 2 * progress);
+    const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
     this.camera.position.lerpVectors(transition.cameraStart, transition.cameraEnd, eased);
     this.controls.target.lerpVectors(transition.targetStart, transition.targetEnd, eased);
     if (progress === 1) this.focusTransition = undefined;
@@ -863,11 +926,100 @@ export class GlobeEngine {
 
   private readonly handleControlsStart = (): void => {
     this.focusTransition = undefined;
+    this.onManualCameraInteraction?.();
     if (this.followEnabled) {
       this.followEnabled = false;
       this.onFollowExited?.();
     }
   };
+
+  private beginCameraTransition(
+    cameraEnd: THREE.Vector3,
+    targetEnd: THREE.Vector3,
+    durationMs: number,
+  ): void {
+    this.focusTransition = {
+      startedAtMs: performance.now(),
+      durationMs,
+      cameraStart: this.camera.position.clone(),
+      cameraEnd,
+      targetStart: this.controls.target.clone(),
+      targetEnd,
+    };
+  }
+
+  private updateHoverAcquisition(): void {
+    if (!this.pointerInside || !this.hoverPending || !this.satelliteCloud) return;
+    const nowMs = performance.now();
+    if (nowMs - this.lastHoverUpdateAtMs < HOVER_INTERVAL_MS) return;
+    this.lastHoverUpdateAtMs = nowMs;
+    this.hoverPending = false;
+
+    const cloud = this.satelliteCloud;
+    this.hoverRaycaster.params.Points = {
+      threshold: Math.max(0.04, this.camera.position.distanceTo(this.controls.target) * 0.008),
+    };
+    this.hoverRaycaster.setFromCamera(this.pointerNdc, this.camera);
+    const intersections = this.hoverRaycaster.intersectObject(cloud.points, false);
+    for (const intersection of intersections) {
+      const index = intersection.index;
+      if (
+        index !== undefined &&
+        index !== this.selectedIndex &&
+        cloud.visibility[index] > 0 &&
+        Boolean(this.readSatellitePosition(index, this.hoverPosition)) &&
+        !this.isOccludedByEarth(this.hoverPosition)
+      ) {
+        this.setHoveredIndex(index);
+        return;
+      }
+    }
+    this.setHoveredIndex(null);
+  }
+
+  private setHoveredIndex(index: number | null): void {
+    if (index === this.hoveredIndex) return;
+    const cloud = this.satelliteCloud;
+    if (cloud && this.hoveredIndex !== null) cloud.emphasis[this.hoveredIndex] = 1;
+    this.hoveredIndex = index;
+    if (cloud && index !== null) cloud.emphasis[index] = 2.25;
+    if (cloud)
+      (cloud.geometry.getAttribute('emphasis') as THREE.BufferAttribute).needsUpdate = true;
+
+    if (index === null || !cloud) {
+      this.hoverLabel.hidden = true;
+      this.onSatelliteHovered?.(null);
+      return;
+    }
+    const position = this.readSatellitePosition(index, this.hoverPosition);
+    const altitudeKm = position
+      ? Math.max(0, (position.length() - EARTH_RADIUS) * EARTH_EQUATORIAL_RADIUS_KM)
+      : 0;
+    this.hoverLabel.textContent = `${cloud.records[index].name} · ALT ${altitudeKm.toFixed(0)} KM`;
+    this.onSatelliteHovered?.({ index, altitudeKm });
+  }
+
+  private updateHoveredVisual(): void {
+    if (
+      this.hoveredIndex === null ||
+      !this.readSatellitePosition(this.hoveredIndex, this.hoverPosition)
+    ) {
+      this.hoverLabel.hidden = true;
+      return;
+    }
+    this.projectedPosition.copy(this.hoverPosition).project(this.camera);
+    const visible =
+      this.projectedPosition.z >= -1 &&
+      this.projectedPosition.z <= 1 &&
+      Math.abs(this.projectedPosition.x) <= 1.1 &&
+      Math.abs(this.projectedPosition.y) <= 1.1 &&
+      !this.isOccludedByEarth(this.hoverPosition);
+    this.hoverLabel.hidden = !visible;
+    if (!visible) return;
+    const x = (this.projectedPosition.x * 0.5 + 0.5) * this.canvas.clientWidth;
+    const y = (-this.projectedPosition.y * 0.5 + 0.5) * this.canvas.clientHeight;
+    this.hoverLabel.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, calc(-100% - 0.75rem))`;
+  }
 
   private updateCategoryColors(): void {
     const cloud = this.satelliteCloud;
@@ -929,6 +1081,7 @@ export class GlobeEngine {
 
   private clearSatelliteCloud(): void {
     if (!this.satelliteCloud) return;
+    this.setHoveredIndex(null);
     this.scene.remove(this.satelliteCloud.points);
     this.satelliteCloud.geometry.dispose();
     this.satelliteCloud.material.dispose();

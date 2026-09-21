@@ -25,6 +25,68 @@
   </div>
 </header>
 
+<section
+  class="showcase-panel hud-panel"
+  [class.is-collapsed]="!quickViewsExpanded()"
+  aria-label="Curated visualization views"
+>
+  <div class="showcase-heading">
+    <div class="showcase-title">
+      <span>{{ demoActive() ? 'Guided tour' : 'Quick views' }}</span>
+      <small>
+        {{ demoActive() ? demoStage() || 'Preparing first view' : 'Curated orbital scenes' }}
+      </small>
+    </div>
+    <div class="showcase-heading-actions">
+      @if (demoActive()) {
+        <button type="button" class="exit-tour-button" (click)="exitDemo()">Exit tour</button>
+      } @else if (quickViewsExpanded()) {
+        <button type="button" class="home-button" (click)="resetView()">Home</button>
+      }
+      <button
+        type="button"
+        class="collapse-button"
+        [attr.aria-expanded]="quickViewsExpanded()"
+        [attr.aria-label]="quickViewsExpanded() ? 'Minimize Quick Views' : 'Open Quick Views'"
+        (click)="toggleQuickViews()"
+      >
+        {{ quickViewsExpanded() ? 'Minimize' : 'Open' }}
+      </button>
+    </div>
+  </div>
+
+  @if (quickViewsExpanded()) {
+    @if (demoActive()) {
+      <div class="tour-running" aria-live="polite">
+        <strong>Automated 43-second tour in progress</strong>
+        <span>Uses real orbital data and the controls below. Any manual control exits.</span>
+      </div>
+    } @else {
+      <p class="quick-views-intro">Each view applies its filter, scale, and camera framing.</p>
+      <div class="preset-controls">
+        @for (preset of visualizationPresets; track preset.id) {
+          <button
+            type="button"
+            [class.is-active]="activePresetId() === preset.id"
+            [title]="preset.description"
+            (click)="applyPreset(preset.id)"
+          >
+            <span>{{ preset.label }}</span>
+            <small>{{ preset.description }}</small>
+          </button>
+        }
+      </div>
+      <div class="guided-tour-callout">
+        <div>
+          <strong>New to the visualization?</strong>
+          <span>43 seconds · Starlink → GPS → GEO → ISS</span>
+        </div>
+        <button type="button" (click)="startDemo()">Watch guided tour</button>
+      </div>
+    }
+  }
+</section>
+
 <section class="time-panel hud-panel" aria-label="Simulation time controls">
   <div class="panel-heading">
     <span>Simulation time</span>
@@ -288,8 +350,20 @@
       }
     </div>
   } @else {
-    <div class="panel-heading"><span>Target acquisition</span><span>Standby</span></div>
-    <p class="empty-state">Select a visible point or search the orbital catalog.</p>
+    @if (hoveredRecord(); as hovered) {
+      <div class="panel-heading">
+        <span>Target acquisition</span><span class="is-tracking">Tracking</span>
+      </div>
+      <div class="hover-acquisition">
+        <strong>{{ hovered.name }}</strong>
+        <span>Norad {{ hovered.noradId }}</span>
+        <span>Alt {{ hoveredSatellite()!.altitudeKm.toFixed(0) }} km</span>
+        <small>Click to lock target</small>
+      </div>
+    } @else {
+      <div class="panel-heading"><span>Target acquisition</span><span>Standby</span></div>
+      <p class="empty-state">Hover or select an orbital object.</p>
+    }
   }
 </section>
 
@@ -417,5 +491,18 @@
     } @else {
       <p class="empty-state">Acquiring surface position</p>
     }
+  </section>
+}
+
+@if (introVisible()) {
+  <section class="intro-affordance hud-panel" aria-label="Explore Satellite Command">
+    <strong>{{ formatInteger(trackedCount()) }} objects currently tracked</strong>
+    <span>
+      Explore manually, or watch a 43-second tour of real Starlink, GPS, GEO, and ISS orbits.
+    </span>
+    <div>
+      <button type="button" (click)="explore()">Explore on my own</button>
+      <button type="button" class="is-active" (click)="startDemo()">Watch guided tour</button>
+    </div>
   </section>
 }

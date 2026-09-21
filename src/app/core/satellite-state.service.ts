@@ -5,6 +5,7 @@ import {
   SatelliteFilter,
   SatelliteTelemetry,
 } from '../models/satellite.model';
+import { HoveredSatellite } from '../models/visualization.model';
 import { matchesSatelliteFilter, searchSatellites } from '../orbital/satellite-catalog';
 
 export type CatalogStatus = 'loading' | 'initializing' | 'tracking' | 'unavailable';
@@ -26,6 +27,7 @@ export class SatelliteStateService {
   private readonly focusRequestState = signal(0);
   private readonly exitCameraModeRequestState = signal(0);
   private readonly initializedCountState = signal(0);
+  private readonly hoveredSatelliteState = signal<HoveredSatellite | null>(null);
 
   readonly catalog = this.catalogState.asReadonly();
   readonly status = this.statusState.asReadonly();
@@ -42,6 +44,11 @@ export class SatelliteStateService {
   readonly focusRequest = this.focusRequestState.asReadonly();
   readonly exitCameraModeRequest = this.exitCameraModeRequestState.asReadonly();
   readonly trackedCount = this.initializedCountState.asReadonly();
+  readonly hoveredSatellite = this.hoveredSatelliteState.asReadonly();
+  readonly hoveredRecord = computed(() => {
+    const hovered = this.hoveredSatelliteState();
+    return hovered === null ? null : (this.catalogState()?.satellites[hovered.index] ?? null);
+  });
   readonly selectedSatellite = computed(() => {
     const index = this.selectedIndexState();
     return index === null ? null : (this.catalogState()?.satellites[index] ?? null);
@@ -77,6 +84,11 @@ export class SatelliteStateService {
 
   setFilter(filter: SatelliteFilter): void {
     this.filterState.set(filter);
+    const hovered = this.hoveredSatelliteState();
+    const hoveredRecord = hovered ? this.catalogState()?.satellites[hovered.index] : null;
+    if (hovered && (!hoveredRecord || !matchesSatelliteFilter(hoveredRecord, filter))) {
+      this.hoveredSatelliteState.set(null);
+    }
   }
 
   setSearchQuery(query: string): void {
@@ -96,6 +108,21 @@ export class SatelliteStateService {
     this.showVisibilityFootprintState.set(false);
     this.followState.set(false);
     this.searchQueryState.set('');
+    this.hoveredSatelliteState.set(null);
+  }
+
+  setHoveredSatellite(hovered: HoveredSatellite | null): void {
+    if (hovered?.index === this.selectedIndexState()) hovered = null;
+    const current = this.hoveredSatelliteState();
+    if (
+      current?.index === hovered?.index &&
+      (current === null ||
+        hovered === null ||
+        Math.abs(current.altitudeKm - hovered.altitudeKm) < 1)
+    ) {
+      return;
+    }
+    this.hoveredSatelliteState.set(hovered);
   }
 
   updateSelectedTelemetry(telemetry: SatelliteTelemetry | null): void {
@@ -108,10 +135,18 @@ export class SatelliteStateService {
     }
   }
 
+  setOrbitVisible(visible: boolean): void {
+    this.showOrbitState.set(visible && this.selectedIndexState() !== null);
+  }
+
   toggleGroundTrack(): void {
     if (this.selectedIndexState() !== null) {
       this.showGroundTrackState.update((visible) => !visible);
     }
+  }
+
+  setGroundTrackVisible(visible: boolean): void {
+    this.showGroundTrackState.set(visible && this.selectedIndexState() !== null);
   }
 
   toggleVisibilityFootprint(): void {
@@ -130,12 +165,20 @@ export class SatelliteStateService {
     this.followState.set(false);
   }
 
+  setFollow(enabled: boolean): void {
+    this.followState.set(enabled && this.selectedIndexState() !== null);
+  }
+
   setColorMode(mode: SatelliteColorMode): void {
     this.colorModeState.set(mode);
   }
 
   toggleReferenceOrbits(): void {
     this.showReferenceOrbitsState.update((visible) => !visible);
+  }
+
+  setReferenceOrbitsVisible(visible: boolean): void {
+    this.showReferenceOrbitsState.set(visible);
   }
 
   requestFocus(): void {
@@ -145,6 +188,16 @@ export class SatelliteStateService {
   }
 
   exitCameraMode(): void {
+    this.followState.set(false);
+    this.exitCameraModeRequestState.update((request) => request + 1);
+  }
+
+  resetVisualization(): void {
+    this.filterState.set('ALL');
+    this.colorModeState.set('CATEGORY');
+    this.select(null);
+    this.showReferenceOrbitsState.set(false);
+    this.showVisibilityFootprintState.set(false);
     this.followState.set(false);
     this.exitCameraModeRequestState.update((request) => request + 1);
   }

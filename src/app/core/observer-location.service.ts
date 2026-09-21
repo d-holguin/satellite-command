@@ -90,6 +90,10 @@ export class ObserverLocationService {
     if (this.locationState()) this.aboveOnlyState.update((enabled) => !enabled);
   }
 
+  setAboveOnly(enabled: boolean): void {
+    this.aboveOnlyState.set(enabled && Boolean(this.locationState()));
+  }
+
   updateCalculatedState(
     aboveSatellites: readonly ObserverSatelliteLook[],
     selectedLook: SelectedObserverLook | null,

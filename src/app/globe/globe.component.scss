@@ -28,7 +28,7 @@ canvas:active {
   background: rgba(2, 8, 13, 0.72);
   color: #dffaff;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.58rem;
+  font-size: 0.66rem;
   letter-spacing: 0.14em;
   line-height: 1;
   pointer-events: none;
@@ -45,4 +45,15 @@ canvas:active {
   height: 0.7rem;
   background: rgba(139, 225, 247, 0.48);
   content: '';
+}
+
+.hover-label {
+  border-color: rgba(194, 226, 236, 0.36);
+  color: rgba(232, 245, 250, 0.96);
+  font-size: 0.64rem;
+}
+
+.hover-label::after {
+  height: 0.55rem;
+  background: rgba(194, 226, 236, 0.36);
 }

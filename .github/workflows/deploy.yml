@@ -6,8 +6,8 @@ on:
       - main
   workflow_dispatch:
   schedule:
-    # Refresh orbital elements and redeploy the static catalog every six hours.
-    - cron: '17 */6 * * *'
+    # Refresh orbital elements and redeploy the static catalog once a day.
+    - cron: '17 3 * * *'
 
 permissions:
   contents: read
